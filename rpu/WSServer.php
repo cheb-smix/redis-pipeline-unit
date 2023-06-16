@@ -3,9 +3,12 @@
 namespace rpu;
 
 use websocket\SmixWebSocketServer;
+use redis\Connection;
 
 class WSServer extends SmixWebSocketServer
 {
+    private $redis;
+    private $connected = false;
     protected $pipeline = [];
     protected $pipewidth = 32;
     protected $pipelineMinClients = 50;
@@ -15,6 +18,7 @@ class WSServer extends SmixWebSocketServer
         $this->pipeline[0] = [];
         $this->pipewidth = $config["pipewidth"];
         $this->pipelineMinClients = $config["pipelineMinClients"];
+
         parent::__construct($config);
     }
 
@@ -22,7 +26,7 @@ class WSServer extends SmixWebSocketServer
     {
         $connectionsCnt = count($this->connections);
 
-        // $this->pipewidth = ceil($connectionsCnt / 10);
+        $this->pipewidth = ceil($connectionsCnt / 10);
 
         foreach ($this->pipeline as $dbnum => $requests) {
             if (!$requests) {
@@ -43,11 +47,13 @@ class WSServer extends SmixWebSocketServer
     {
         $cmds = array_merge(["SELECT $dbnum"], array_column($this->pipeline[$dbnum], "request"));
 
-        // $results = Yii::$app->cacheInstance->pipeline($cmds);
+        if (!$this->connected) {
+            $this->redis = new Connection($this->config["redis"]);
+        }
 
-        // array_shift($results);
+        $results = $this->redis->pipeline($cmds);
 
-        $results = ["HELLO MOTHERFUCKER"];
+        array_shift($results);
 
         $reqIndex = 0;
 

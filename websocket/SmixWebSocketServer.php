@@ -4,8 +4,8 @@ namespace websocket;
 
 class SmixWebSocketServer
 {
-    private $config = [];
-    private $addr = "";
+    protected $config = [];
+    protected $addr = "";
     protected $maxConnections = 0;
     protected $connections = [];
     protected $active = [];

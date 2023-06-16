@@ -10,7 +10,7 @@ class App
 
     public function __construct($argv)
     {
-        $this->autoload(["./websocket", "./rpu"]);
+        $this->autoload(["./websocket", "./rpu", "./redis"]);
 
         if (file_exists(__DIR__ . "/../config/main-local.php")) {
             $this->config = array_merge(

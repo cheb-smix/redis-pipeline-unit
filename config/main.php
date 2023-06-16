@@ -9,6 +9,10 @@ return [
         "ip"                => "127.0.0.1",
         "port"              => 1988,
     ],
+    "redis" => [
+        "hostname"  => 'localhost',
+        "port"      => 6379,
+    ],
     "pipewidth" => 2,
     "pipelineMinClients" => 1,
 ];
