@@ -6,6 +6,7 @@ class SmixWebSocketServer
 {
     private $config = [];
     private $addr = "";
+    protected $maxConnections = 0;
     protected $connections = [];
     protected $active = [];
 
@@ -73,6 +74,10 @@ class SmixWebSocketServer
     private function onSocketOpen($connection, $info)
     {
         $cid = $this->getConnectionID($connection);
+        $currentCnt = count($this->connections);
+        if ($this->maxConnections < $currentCnt) {
+            $this->maxConnections = $currentCnt;
+        }
         $this->printer("New connection! [$cid on {$this->connections[$cid]["peer_name"]}]");
         $this->onOpen($cid);
     }
@@ -120,8 +125,9 @@ class SmixWebSocketServer
     protected function socketStatistics($cid)
     {
         return [
-            "SocketsConnections" => count($this->connections),
-            "SocketsActive" => count($this->active),
+            "SocketConnections"    => count($this->connections),
+            "SocketActive"         => count($this->active),
+            "MaxSocketConnections" => $this->maxConnections,
         ];
     }
 

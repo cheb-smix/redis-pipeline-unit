@@ -15,7 +15,6 @@ class WSServer extends SmixWebSocketServer
         $this->pipeline[0] = [];
         $this->pipewidth = $config["pipewidth"];
         $this->pipelineMinClients = $config["pipelineMinClients"];
-
         parent::__construct($config);
     }
 
@@ -23,7 +22,7 @@ class WSServer extends SmixWebSocketServer
     {
         $connectionsCnt = count($this->connections);
 
-        $this->pipewidth = ceil($connectionsCnt / 10);
+        // $this->pipewidth = ceil($connectionsCnt / 10);
 
         foreach ($this->pipeline as $dbnum => $requests) {
             if (!$requests) {
@@ -112,9 +111,7 @@ class WSServer extends SmixWebSocketServer
 
     protected function socketStatistics($cid)
     {
-        return [
-            "SocketsConnections"    => count($this->connections),
-            "SocketsActive"         => count($this->active),
+        return parent::socketStatistics($cid) + [
             "CurrentPipelineWidth"  => $this->pipewidth,
             "PipelineLength"        => count($this->pipeline),
             "TotalRequestsCount"    => array_sum(array_map(function ($dbreq) {
