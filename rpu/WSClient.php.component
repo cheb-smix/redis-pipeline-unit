@@ -1,11 +1,10 @@
 <?php
 
-namespace console\components;
+namespace rpu;
 
-use Yii;
-use console\components\websocket\SmixWebSocketClient;
+use websocket\SmixWebSocketClient;
 
-class RedisWebSocket extends SmixWebSocketClient
+class WSClient extends SmixWebSocketClient
 {
     public function __call($name, $params)
     {

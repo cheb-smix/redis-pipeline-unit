@@ -1,9 +1,11 @@
 <?php
 
-namespace console\components\websocket;
+namespace websocket;
 
 class SmixConsoleLogger
 {
+    private static $init = false;
+
     public static function progress($done, $total, $size = 30, $label = "", $refreshing = true)
     {
         static $start_time;
@@ -54,8 +56,8 @@ class SmixConsoleLogger
         if (!$data) {
             return;
         }
-        
-        echo "\r" . implode("; ", array_map(function ($k, $v) {
+
+        echo "\r" . implode(";\t", array_map(function ($k, $v) {
             return "$k: $v";
         }, array_keys($data), $data));
     }
