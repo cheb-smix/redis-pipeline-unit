@@ -7,19 +7,17 @@ use redis\Connection;
 
 class WSServer extends SmixWebSocketServer
 {
-    private $redis;
-    private $connected = false;
+    public $redis;
+
+    protected $connected = false;
     protected $pipeline = [];
     protected $pipewidth = 32;
     protected $pipelineMinClients = 50;
 
-    public function __construct(array &$config = [])
+    public function run()
     {
         $this->pipeline[0] = [];
-        $this->pipewidth = $config["pipewidth"];
-        $this->pipelineMinClients = $config["pipelineMinClients"];
-
-        parent::__construct($config);
+        parent::run();
     }
 
     protected function onLoop()
@@ -48,7 +46,8 @@ class WSServer extends SmixWebSocketServer
         $cmds = array_merge(["SELECT $dbnum"], array_column($this->pipeline[$dbnum], "request"));
 
         if (!$this->connected) {
-            $this->redis = new Connection($this->config["redis"]);
+            $this->redis = new Connection($this->redis);
+            $this->connected = true;
         }
 
         $results = $this->redis->pipeline($cmds);

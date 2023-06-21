@@ -6,16 +6,22 @@ use websocket\SmixWebSocketClient;
 
 class WSClient extends SmixWebSocketClient
 {
-    public function __construct(array &$config = [])
+    public $redis;
+
+    public function run()
     {
-        parent::__construct($config);
+        parent::run();
 
-        var_dump($this->send("GET wtf"));
+        $key = "MY_TEST_KEY";
+        $value = str_repeat("1", 10000);
 
-        while (true)
-        {
-            $line = readline("Input your command: ");
-            var_dump($this->send($line));
-        }
+        var_dump($this->send("SET $key $value NX 36000"));
+        var_dump($this->send("GET $key"));
+
+        // while (true)
+        // {
+        //     $line = readline("Input your command: ");
+        //     var_dump($this->send($line));
+        // }
     }
 }

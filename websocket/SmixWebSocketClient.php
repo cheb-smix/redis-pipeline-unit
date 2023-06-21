@@ -2,44 +2,47 @@
 
 namespace websocket;
 
+use websocket\SocketClient as Client;
+
 class SmixWebSocketClient
 {
-    private $config = [];
-    private $addr = "";
-    private $socket = null;
-    private $protocol = "tcp";
-    private $host = "tcp://localhost";
-    private $ip = "localhost";
-    private $port = 1988;
-    private $connectionTimeout = 5;
-    private $secretkey = "jhdfgjkdhg;ldhg;ohgoheoghnherd75d449dtp84su8lj98t4hnm9";
-    private $secWSaccept;
-    private $errno;
-    private $errstr;
-    private $debugMessagesOn = false;
+    public $compressEnabled = false;
+    public $compressMinLength = 2048;
+    public $scheme = "tcp";
+    public $hostname = "localhost";
+    public $port = 1988;
+    public $connectionTimeout = 5;
+    public $chunkSize = 8192;
+    public $secretkey = "jhdfgjkdhg;ldhg;ohgoheoghnherd75d449dtp84su8lj98t4hnm9";
+    public $debugMessagesOn = true;
+    public $lengthInitiatorNumber = 9;
+    
+    protected $socket;
+    protected $origin = "";
+    protected $addr = "";
+    protected $errno;
+    protected $errstr;
 
-    public function __construct(array &$config = [])
+    public function init(array &$config = [])
     {
-        $this->config = &$config;
-        $this->addr = $this->config["socket"]["protocol"] . "://" . $this->config["socket"]["ip"] . ":" . $this->config["socket"]["port"];
+        foreach ($config as $k => $v) {
+            if (isset($this->$k)) $this->$k = $v;
+        }
 
-        foreach (["protocol", "ip", "port", "connectionTimeout", "secretkey"] as $key) {
-            if (isset($this->config["socket"][$key])) {
-                $this->$key = $this->config["socket"][$key];
-            }
-        }
-        if (isset($this->config["debugMessagesOn"])) {
-            $this->debugMessagesOn = $this->config["debugMessagesOn"];
-        }
-        $this->host = "{$this->protocol}://{$this->ip}";
+        $this->origin = "$this->scheme://$this->hostname";
+        $this->addr = "$this->origin:$this->port";
         $this->secretkey = base64_encode(sha1($this->secretkey . "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", true));
 
-        $this->printer(get_class($this) . " started on $this->host:$this->port");
+        return $this;
+    }
+
+    public function run()
+    {
+        $this->printer(get_class($this) . " started on $this->addr");
 
         if (!$this->socket) {
             try {
-                // $this->socket = @fsockopen($this->host, $this->port, $this->errno, $this->errstr, $this->connectionTimeout);
-                $this->socket = stream_socket_client($this->addr, $this->errno, $this->errstr, $this->connectionTimeout);
+                $this->socket = Client::connect($this->hostname, $this->port, $this->errno, $this->errstr, $this->connectionTimeout);
                 if ($this->socket) {
                     $this->handshake();
                 }
@@ -60,8 +63,8 @@ class SmixWebSocketClient
     {
         $head = implode("\r\n", [
             "GET / HTTP/1.1",
-            "Host: $this->host",
-            "Origin: $this->host",
+            "Host: $this->origin",
+            "Origin: $this->origin",
             "Upgrade: websocket",
             "Connection: Keep-Alive, Upgrade",
             "Sec-WebSocket-Extensions: permessage-deflate",
@@ -72,10 +75,9 @@ class SmixWebSocketClient
             "Cache-Control: no-cache",
         ]) . "\r\n\r\n";
 
-        fwrite($this->socket, $head) or die('error:'.$this->errno.':'.$this->errstr);
-
-        $length = fread($this->socket, 3);
-        fread($this->socket, $length);
+        if (!Client::send($this->socket, $head, $this->lengthInitiatorNumber)) {
+            die('error:'.$this->errno.':'.$this->errstr);
+        }
     }
 
     public function send($data)
@@ -88,27 +90,22 @@ class SmixWebSocketClient
                 $data = json_encode($data);
             }
 
-            if (!fwrite($this->socket, $data)) {
-                $this->printer("Failed socket writing");
-                return false;
-            }
+            $response = Client::send($this->socket, $data, $this->lengthInitiatorNumber);
 
-            $length = (int) fread($this->socket, 8);
-            if (!$length) {
+            if ($response === false) {
                 $this->close();
                 $this->printer("Looks like connection lost");
                 return false;
             }
-            $response = fread($this->socket, $length);
 
-            return json_decode($response, true);
+            return $response;
         }
     }
 
     public function close()
     {
         if ($this->socket) {
-            if (fclose($this->socket)) {
+            if (Client::close($this->socket)) {
                 $this->socket = null;
                 return true;
             }

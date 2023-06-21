@@ -2,39 +2,84 @@
 
 namespace websocket;
 
+use websocket\SocketServer as Server;
+
 class SmixWebSocketServer
 {
-    protected $config = [];
+    public $compressEnabled = false;
+    public $compressMinLength = 2048;
+    public $scheme = "tcp";
+    public $hostname = "localhost";
+    public $port = 1988;
+    public $connectionTimeout = 5;
+    public $chunkSize = 8192;
+    public $secretkey = "jhdfgjkdhg;ldhg;ohgoheoghnherd75d449dtp84su8lj98t4hnm9";
+    public $debugMessagesOn = true;
+    public $lengthInitiatorNumber = 9;
+
+    protected $socket;
+    protected $origin = "";
     protected $addr = "";
     protected $maxConnections = 0;
     protected $connections = [];
     protected $active = [];
 
-    public function __construct(array &$config = [])
+    public function __destruct()
     {
-        $this->config = &$config;
-        $this->addr = $this->config["socket"]["protocol"] . "://" . $this->config["socket"]["ip"] . ":" . $this->config["socket"]["port"];
+        Server::close($this->socket);
+        $this->printer("__DESTRUCT");
+    }
 
-        $socket = stream_socket_server($this->addr, $errno, $errstr);
-
-        if (!$socket) {
-            $this->printer("Socket error $errstr ($errno)", false, true);
+    public function init(array &$config = [])
+    {
+        foreach ($config as $k => $v) {
+            if (isset($this->$k)) $this->$k = $v;
         }
 
+        $this->origin = "$this->scheme://$this->hostname";
+        $this->addr = "$this->origin:$this->port";
+
+        return $this;
+    }
+
+    public function run()
+    {
+        // $oldChunkSize = $this->chunkSize;
+
+        $errno = $errstr = null;
+
+        $this->socket = Server::create($this->hostname, $this->port, $errno, $errstr);
+
+        if (!$this->socket) {
+            $this->printer("Socket error $errstr ($errno)", false, true);
+        } else {
+            $this->printer("Socket started at $this->addr");
+        }
+
+        // $this->chunkSize = Server::set_chunk_size($this->socket, $this->chunkSize);
+
+        // if ($oldChunkSize == $this->chunkSize) {
+        //     $this->printer("Unable to change chunkSize of socket stream");
+        // }
+
+        // unset($oldChunkSize);
         $connections = [];
-        $this->printer("Socket started at $this->addr");
 
         while (true) {
             $read = $connections;
-            $read[] = $socket;
+            $read[] = $this->socket;
             $write = $except = null;
 
-            if (!stream_select($read, $write, $except, null)) {
+            if (!Server::select($read, $write, $except, $this->connectionTimeout)) {
                 continue;
             }
 
-            if (in_array($socket, $read)) {
-                if (($connection = stream_socket_accept($socket, -1, $peer_name)) && $info = WSL::handshake($connection)) {
+            if (in_array($this->socket, $read)) {
+                if (
+                    ($connection = Server::accept($this->socket, $this->connectionTimeout, $peer_name)) 
+                    && 
+                    $info = Server::handshake($connection, $this->lengthInitiatorNumber)
+                ) {
                     $connections[] = $connection;
 
                     $cid = $this->getConnectionID($connection);
@@ -42,23 +87,29 @@ class SmixWebSocketServer
                     $this->connections[$cid] = [
                         "resource"  => $connection,
                         "peer_name" => $peer_name,
-                        "allowed"   => true,
                     ];
 
-                    $this->onSocketOpen($connection, $info);
+                    $this->onSocketOpen($connection);
                 }
-                unset($read[ array_search($socket, $read) ]);
+                unset($read[ array_search($this->socket, $read) ]);
             }
 
             foreach($read as $connection) {
-                $data = fread($connection, 100000);
+
+                $data = Server::read($connection, $this->lengthInitiatorNumber);
+                if ($this->compressEnabled) {
+                    // $data = @gzinflate($data);
+                }
+
                 $cid = $this->getConnectionID($connection);
-                if (!$data or !$this->connections[$cid]["allowed"]) {
-                    fclose($connection);
+
+                if (!$data) {
+                    Server::close($connection);
                     unset($connections[array_search($connection, $connections)]);
                     $this->onSocketClose($connection);
                     continue;
                 }
+
                 $this->onSocketMessage($connection, $data);
             }
 
@@ -71,7 +122,7 @@ class SmixWebSocketServer
         $this->onLoop();
     }
 
-    private function onSocketOpen($connection, $info)
+    private function onSocketOpen($connection)
     {
         $cid = $this->getConnectionID($connection);
         $currentCnt = count($this->connections);
@@ -97,7 +148,7 @@ class SmixWebSocketServer
         if ($message == "monitoring") {
             $this->outputData($cid, $this->socketStatistics($cid), false);
         } else {
-            $this->printer("Message from $cid: $message");
+            $this->printer("Message from $cid [" . strlen($message) . "]: $message");
             $this->onMessage($cid, $message);
         }
     }
@@ -153,17 +204,29 @@ class SmixWebSocketServer
         }
     }
 
-    public function outputData($cid, $data = [], $logging = true)
+    public function outputData($cid, $data, $logging = true)
     {
-        $data = json_encode($data, JSON_UNESCAPED_UNICODE);
-        $data = sprintf("%08d", strlen($data)) . $data;
-        fwrite($this->connections[$cid]['resource'], $data);
+        Server::write($this->connections[$cid]['resource'], $data, $this->lengthInitiatorNumber);
 
         if ($logging) $this->printer("Response: $data");
 
         unset($this->active[$cid]);
 
         return true;
+    }
+
+    private function getChunksSizes($length = 0)
+    {
+        $a = [];
+        while ($length > 0) {
+            if ($length >= $this->chunkSize) {
+                $a[] = $this->chunkSize;
+            } else {
+                $a[] = $length;
+            }
+            $length -= $this->chunkSize;
+        }
+        return $a;
     }
 
 }

@@ -21,6 +21,8 @@ class App
             $this->config = require(__DIR__ . "/../config/main.php");
         }
 
+        // var_dump($this->classes);
+
         $this->argv = $argv;
     }
 
@@ -28,15 +30,15 @@ class App
     {
         if (\in_array("server", $this->argv)) {
 
-            $client = new WSServer($this->config);
+            (new WSServer())->init($this->config)->run();
 
         } elseif (\in_array("monitor", $this->argv)) {
 
-            $client = new WSMonitor($this->config);
+            (new WSMonitor())->init($this->config)->run();
 
         } elseif (\in_array("client", $this->argv)) {
 
-            $client = new WSClient($this->config);
+            (new WSClient())->init($this->config)->run();
 
         }
     }
