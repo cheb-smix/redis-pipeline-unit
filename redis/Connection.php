@@ -2,6 +2,8 @@
 
 namespace redis;
 
+use rpu\Helper;
+
 class Connection
 {
     public $hostname = 'localhost';
@@ -151,7 +153,7 @@ class Connection
         $prettyCommand = implode(' ', $params);
 
         if (($line = fgets($this->socket)) === false) {
-            throw new \Exception("Failed to read from socket.\nRedis command was: " . $prettyCommand);
+            throw new \Exception("Failed to read from socket.\nRedis command was: " . "[" . strlen($prettyCommand) . "]" . $prettyCommand);
         }
         $type = $line[0];
         $line = mb_substr($line, 1, -2, '8bit');
@@ -163,7 +165,7 @@ class Connection
 
                 return $line;
             case '-': // Error reply
-                throw new \Exception("Redis error: " . $line . "\nRedis command was: " . $prettyCommand);
+                throw new \Exception("Redis error: " . $line . "\nRedis command was: " . "[" . strlen($prettyCommand) . "]" . $prettyCommand);
             case ':': // Integer reply
                 // no cast to int as it is in the range of a signed 64 bit integer
                 return $line;
@@ -175,7 +177,7 @@ class Connection
                 $data = '';
                 while ($length > 0) {
                     if (($block = fread($this->socket, $length)) === false) {
-                        throw new \Exception("Failed to read from socket.\nRedis command was: " . $prettyCommand);
+                        throw new \Exception("Failed to read from socket.\nRedis command was: " . "[" . strlen($prettyCommand) . "]" . $prettyCommand);
                     }
                     $data .= $block;
                     $length -= mb_strlen($block, '8bit');
@@ -191,7 +193,7 @@ class Connection
 
                 return $data;
             default:
-                throw new \Exception('Received illegal data from redis: ' . $line . "\nRedis command was: " . $prettyCommand);
+                throw new \Exception('Received illegal data from redis: ' . $line . "\nRedis command was: " . "[" . strlen($prettyCommand) . "]" . $prettyCommand);
         }
     }
 
@@ -226,8 +228,10 @@ class Connection
             $line = fgets($this->socket);
 
             if ($line === false) {
-                throw new \Exception("Failed to read from socket.\nRedis command was: " . $prettyCommand);
+                throw new \Exception("Failed to read from socket.\nRedis command was: " . "[" . strlen($prettyCommand) . "]" . $prettyCommand);
             }
+
+            Helper::printer($line);
 
             $type = $line[0];
             $line = mb_substr($line, 1, -2, '8bit');
@@ -242,7 +246,7 @@ class Connection
                     $result[] = $line;
                     break;
                 case '-': 
-                    throw new \Exception("Redis error: " . $line . "\nRedis command was: " . $prettyCommand);
+                    throw new \Exception("Redis error: " . $line . "\nRedis command was: " . "[" . strlen($prettyCommand) . "]" . $prettyCommand);
                 case ':': 
                     $result[] = $line;
                     break;
@@ -255,7 +259,7 @@ class Connection
                     $data = '';
                     while ($length > 0) {
                         if (($block = fread($this->socket, $length)) === false) {
-                            throw new \Exception("Failed to read from socket.\nRedis command was: " . $prettyCommand);
+                            throw new \Exception("Failed to read from socket.\nRedis command was: " . "[" . strlen($prettyCommand) . "]" . $prettyCommand);
                         }
                         $data .= $block;
                         $length -= mb_strlen($block, '8bit');
@@ -273,7 +277,7 @@ class Connection
                     $result[] = $data;
                     break;
                 default:
-                    throw new \Exception('Received illegal data from redis: ' . $line . "\nRedis command was: " . $prettyCommand);
+                    throw new \Exception('Received illegal data from redis: ' . $line . "\nRedis command was: " . "[" . strlen($prettyCommand) . "]" . $prettyCommand);
             }
 
             $cnt--;

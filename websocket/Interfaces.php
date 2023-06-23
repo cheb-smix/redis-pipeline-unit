@@ -3,9 +3,10 @@ namespace websocket;
 
 interface CommonInterface
 {
+    public static function readline(&$socket);
     public static function read(&$socket, int $lengthInitiatorNumber = 9);
-    public static function write(&$socket, string $data, int $lengthInitiatorNumber = 9);
-    public static function send(&$socket, string $data, int $lengthInitiatorNumber = 9);
+    public static function write(&$socket, $data, int $lengthInitiatorNumber = 9);
+    public static function send(&$socket, $data, int $lengthInitiatorNumber = 9);
     public static function close(&$connection);
     public static function handshake(&$socket, int $lengthInitiatorNumber = 9);
 }

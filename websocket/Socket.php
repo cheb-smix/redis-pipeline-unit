@@ -1,27 +1,44 @@
 <?php
 namespace websocket;
 
+use rpu\Helper;
+
 class SocketCommon implements \websocket\CommonInterface
 {
-    public static function read(&$socket, int $lengthInitiatorNumber = 9)
+    public static function readline(&$socket)
     {
+        return @socket_read($socket, 1000, PHP_NORMAL_READ);
+    }
+
+    public static function read(&$socket, int $lengthInitiatorNumber = 9, bool $clearly = false)
+    {
+        if ($clearly) {
+            return socket_read($socket, $lengthInitiatorNumber);
+        }
+
         if ($length = (int) socket_read($socket, $lengthInitiatorNumber)) {
-            return socket_read($socket, $length);
+            return @socket_read($socket, $length);
         }
         
         return false;
     }
 
-    public static function write(&$socket, string $data, int $lengthInitiatorNumber = 9)
+    public static function write(&$socket, $data, int $lengthInitiatorNumber = 9, bool $clearly = false)
     {
+        if ($clearly) {
+            return socket_send($socket, $data, \strlen($data), MSG_EOF);
+        }
+
+        if (!$data) $data = "0";
+
         if ($length = strlen($data)) {
-            return socket_write($socket, sprintf("%0{$lengthInitiatorNumber}d", $length) . $data, $length);
+            return @socket_write($socket, sprintf("%0{$lengthInitiatorNumber}d", $length) . $data, $length + $lengthInitiatorNumber);
         }
 
         return false;
     }
 
-    public static function send(&$socket, string $data, int $lengthInitiatorNumber = 9)
+    public static function send(&$socket, $data, int $lengthInitiatorNumber = 9)
     {
         if (self::write($socket, $data, $lengthInitiatorNumber)) {
             return self::read($socket, $lengthInitiatorNumber);
@@ -32,7 +49,7 @@ class SocketCommon implements \websocket\CommonInterface
 
     public static function close(&$socket)
     {
-        return socket_close($socket);
+        return $socket ? @socket_close($socket) : false;
     }
 
     public static function handshake(&$socket, int $lengthInitiatorNumber = 9)
@@ -75,6 +92,7 @@ class SocketCommon implements \websocket\CommonInterface
     }
 }
 
+
 class SocketServer extends SocketCommon implements \websocket\ServerInterface
 {
     public static function create($hostname, $port, &$errno, &$errstr)
@@ -88,6 +106,9 @@ class SocketServer extends SocketCommon implements \websocket\ServerInterface
         if (!socket_listen($socket)) {
             return false;
         }
+
+        // socket_set_option($socket, SOL_SOCKET, SO_LINGER, ['l_linger' => 0, 'l_onoff' => 1]);
+
         return $socket;
     }
 
@@ -115,6 +136,7 @@ class SocketServer extends SocketCommon implements \websocket\ServerInterface
         return socket_accept($socket);
     }
 }
+
 
 class SocketClient extends SocketCommon implements \websocket\ClientInterface
 {

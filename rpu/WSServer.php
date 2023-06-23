@@ -3,16 +3,24 @@
 namespace rpu;
 
 use websocket\SmixWebSocketServer;
-use redis\Connection;
+use redis\ConnectionV2 as RedisClient;
 
 class WSServer extends SmixWebSocketServer
 {
     public $redis;
 
+    protected $currentDatabase = 0;
     protected $connected = false;
     protected $pipeline = [];
     protected $pipewidth = 32;
     protected $pipelineMinClients = 50;
+
+    public function __destruct()
+    {
+        Helper::printer($this->redis->close() ? "Redis connection closed" : "Redis connection closing failed");
+
+        parent::__destruct();
+    }
 
     public function run()
     {
@@ -24,17 +32,19 @@ class WSServer extends SmixWebSocketServer
     {
         $connectionsCnt = count($this->connections);
 
-        $this->pipewidth = ceil($connectionsCnt / 10);
+        // $this->pipewidth = ceil($connectionsCnt / 10);
 
         foreach ($this->pipeline as $dbnum => $requests) {
             if (!$requests) {
                 continue;
             }
             if ($connectionsCnt < $this->pipelineMinClients || count($requests) >= $this->pipewidth) {
+                Helper::printer("Execute by requests count");
                 $this->executePipeline($dbnum);
                 continue;
             }
             if (array_sum(array_column($requests, "count")) >= $this->pipewidth) {
+                Helper::printer("Execute by clients per requests count");
                 $this->executePipeline($dbnum);
                 continue;
             }
@@ -43,16 +53,23 @@ class WSServer extends SmixWebSocketServer
 
     protected function executePipeline($dbnum)
     {
-        $cmds = array_merge(["SELECT $dbnum"], array_column($this->pipeline[$dbnum], "request"));
+        $cmds = array_column($this->pipeline[$dbnum], "request");
+        $shift = false;
+
+        if ($this->currentDatabase != $dbnum) {
+            array_unshift($cmds, "SELECT $dbnum");
+            $this->currentDatabase = $dbnum;
+            $shift = true;
+        }
 
         if (!$this->connected) {
-            $this->redis = new Connection($this->redis);
+            $this->redis = new RedisClient($this->redis);
             $this->connected = true;
         }
 
         $results = $this->redis->pipeline($cmds);
 
-        array_shift($results);
+        if ($shift) array_shift($results);
 
         $reqIndex = 0;
 

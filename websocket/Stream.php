@@ -1,8 +1,15 @@
 <?php
 namespace websocket;
 
+use rpu\Helper;
+
 class StreamCommon implements \websocket\CommonInterface
 {
+    public static function readline(&$socket)
+    {
+        return @fgets($socket);
+    }
+
     public static function read(&$socket, int $lengthInitiatorNumber = 9)
     {
         if ($length = (int) fread($socket, $lengthInitiatorNumber)) {
@@ -12,16 +19,18 @@ class StreamCommon implements \websocket\CommonInterface
         return false;
     }
 
-    public static function write(&$socket, string $data, int $lengthInitiatorNumber = 9)
+    public static function write(&$socket, $data, int $lengthInitiatorNumber = 9)
     {
+        if (!$data) $data = 0;
+
         if ($length = strlen($data)) {
-            return fwrite($socket, sprintf("%0{$lengthInitiatorNumber}d", $length) . $data, $length);
+            return fwrite($socket, sprintf("%0{$lengthInitiatorNumber}d", $length) . $data, $length + $lengthInitiatorNumber);
         }
         
         return false;
     }
 
-    public static function send(&$socket, string $data, int $lengthInitiatorNumber = 9)
+    public static function send(&$socket, $data, int $lengthInitiatorNumber = 9)
     {
         if (self::write($socket, $data, $lengthInitiatorNumber)) {
             return self::read($socket, $lengthInitiatorNumber);
@@ -32,7 +41,7 @@ class StreamCommon implements \websocket\CommonInterface
 
     public static function close(&$socket)
     {
-        return fclose($socket);
+        return $socket ? fclose($socket) : false;
     }
 
     public static function handshake(&$socket, int $lengthInitiatorNumber = 9)

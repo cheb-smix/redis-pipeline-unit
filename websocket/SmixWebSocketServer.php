@@ -2,6 +2,7 @@
 
 namespace websocket;
 
+use rpu\Helper;
 use websocket\SocketServer as Server;
 
 class SmixWebSocketServer
@@ -26,14 +27,17 @@ class SmixWebSocketServer
 
     public function __destruct()
     {
-        Server::close($this->socket);
-        $this->printer("__DESTRUCT");
+        foreach ($this->connections as $c) {
+            Helper::printer($c["peer_name"] . (Server::close($c["connection"]) ? " has been disconnected" : " disconnection failed"));
+        }
+        Helper::printer(Server::close($this->socket) ? "Main socket closed" : "Main socket closing failed");
+        Helper::printer("SERVER DESTRUCT");
     }
 
     public function init(array &$config = [])
     {
         foreach ($config as $k => $v) {
-            if (isset($this->$k)) $this->$k = $v;
+            if (property_exists($this, $k)) $this->$k = $v;
         }
 
         $this->origin = "$this->scheme://$this->hostname";
@@ -51,15 +55,15 @@ class SmixWebSocketServer
         $this->socket = Server::create($this->hostname, $this->port, $errno, $errstr);
 
         if (!$this->socket) {
-            $this->printer("Socket error $errstr ($errno)", false, true);
+            Helper::printer("Socket error $errstr ($errno)", false, true);
         } else {
-            $this->printer("Socket started at $this->addr");
+            Helper::printer("Socket started at $this->addr");
         }
 
         // $this->chunkSize = Server::set_chunk_size($this->socket, $this->chunkSize);
 
         // if ($oldChunkSize == $this->chunkSize) {
-        //     $this->printer("Unable to change chunkSize of socket stream");
+        //     Helper::printer("Unable to change chunkSize of socket stream");
         // }
 
         // unset($oldChunkSize);
@@ -73,6 +77,8 @@ class SmixWebSocketServer
             if (!Server::select($read, $write, $except, $this->connectionTimeout)) {
                 continue;
             }
+
+            Helper::printer("Loop");
 
             if (in_array($this->socket, $read)) {
                 if (
@@ -119,6 +125,7 @@ class SmixWebSocketServer
 
     private function onSocketLoop()
     {
+        sleep(1);
         $this->onLoop();
     }
 
@@ -129,7 +136,7 @@ class SmixWebSocketServer
         if ($this->maxConnections < $currentCnt) {
             $this->maxConnections = $currentCnt;
         }
-        $this->printer("New connection! [$cid on {$this->connections[$cid]["peer_name"]}]");
+        Helper::printer("New connection! [$cid on {$this->connections[$cid]["peer_name"]}]");
         $this->onOpen($cid);
     }
     
@@ -138,7 +145,7 @@ class SmixWebSocketServer
         $cid = $this->getConnectionID($connection);
         $this->onClose($cid);
         unset($this->connections[$cid], $this->active[$cid]);
-        $this->printer("Connection $cid has disconnected");
+        Helper::printer("Connection $cid has disconnected");
     }
     
     private function onSocketMessage($connection, $message)
@@ -148,14 +155,14 @@ class SmixWebSocketServer
         if ($message == "monitoring") {
             $this->outputData($cid, $this->socketStatistics($cid), false);
         } else {
-            $this->printer("Message from $cid [" . strlen($message) . "]: $message");
+            Helper::printer("Message from $cid [" . strlen($message) . "]: $message");
             $this->onMessage($cid, $message);
         }
     }
 
     protected function onLoop()
     {
-
+        
     }
 
     protected function onOpen($cid)
@@ -208,7 +215,7 @@ class SmixWebSocketServer
     {
         Server::write($this->connections[$cid]['resource'], $data, $this->lengthInitiatorNumber);
 
-        if ($logging) $this->printer("Response: $data");
+        if ($logging) Helper::printer("Response: $data");
 
         unset($this->active[$cid]);
 

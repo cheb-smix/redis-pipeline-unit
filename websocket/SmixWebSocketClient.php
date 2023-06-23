@@ -2,6 +2,7 @@
 
 namespace websocket;
 
+use rpu\Helper;
 use websocket\SocketClient as Client;
 
 class SmixWebSocketClient
@@ -26,7 +27,7 @@ class SmixWebSocketClient
     public function init(array &$config = [])
     {
         foreach ($config as $k => $v) {
-            if (isset($this->$k)) $this->$k = $v;
+            if (property_exists($this, $k)) $this->$k = $v;
         }
 
         $this->origin = "$this->scheme://$this->hostname";
@@ -38,7 +39,7 @@ class SmixWebSocketClient
 
     public function run()
     {
-        $this->printer(get_class($this) . " started on $this->addr");
+        Helper::printer(get_class($this) . " started on $this->addr");
 
         if (!$this->socket) {
             try {
@@ -47,7 +48,7 @@ class SmixWebSocketClient
                     $this->handshake();
                 }
             } catch (Exception $e) {
-                $this->printer("Failed socket connection [$this->errno] $this->errstr");
+                Helper::printer("Failed socket connection [$this->errno] $this->errstr");
                 return false;
             }
         }
@@ -55,8 +56,10 @@ class SmixWebSocketClient
 
     public function __destruct()
     {
-        $this->printer("DESCTRUCT");
-        $this->close();
+        Helper::printer("CLIENT DESCTRUCT");
+        if (!$this->close()) {
+            Helper::printer("FUCKED UP CLOSING SOCKET");
+        }
     }
 
     private function handshake()
@@ -83,7 +86,7 @@ class SmixWebSocketClient
     public function send($data)
     {
         if (!$this->socket) {
-            $this->printer("Socket error");
+            Helper::printer("Socket error");
             return false;
         } else {
             if (!is_string($data)) {
@@ -94,7 +97,7 @@ class SmixWebSocketClient
 
             if ($response === false) {
                 $this->close();
-                $this->printer("Looks like connection lost");
+                Helper::printer("Looks like connection lost");
                 return false;
             }
 
@@ -112,23 +115,5 @@ class SmixWebSocketClient
             return false;
         }
         return null;
-    }
-
-    public function printer($s, $obj = false, $die = false)
-    {
-        if (!$this->debugMessagesOn) return;
-
-        print date("Y-m-d | H:i:s >> ");
-
-        if ($obj) {
-            print_r($s);
-        } else {
-            print $s;
-        }
-        print "\n";
-
-        if ($die) {
-            exit;
-        }
     }
 }
