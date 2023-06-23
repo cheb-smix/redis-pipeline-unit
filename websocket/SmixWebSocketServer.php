@@ -24,6 +24,7 @@ class SmixWebSocketServer
     protected $maxConnections = 0;
     protected $connections = [];
     protected $active = [];
+    protected $started = 0;
 
     public function __destruct()
     {
@@ -48,7 +49,7 @@ class SmixWebSocketServer
 
     public function run()
     {
-        // $oldChunkSize = $this->chunkSize;
+        $this->started = time();
 
         $errno = $errstr = null;
 
@@ -60,13 +61,6 @@ class SmixWebSocketServer
             Helper::printer("Socket started at $this->addr");
         }
 
-        // $this->chunkSize = Server::set_chunk_size($this->socket, $this->chunkSize);
-
-        // if ($oldChunkSize == $this->chunkSize) {
-        //     Helper::printer("Unable to change chunkSize of socket stream");
-        // }
-
-        // unset($oldChunkSize);
         $connections = [];
 
         while (true) {
@@ -120,7 +114,6 @@ class SmixWebSocketServer
 
     private function onSocketLoop()
     {
-        sleep(1);
         $this->onLoop();
     }
 
@@ -150,7 +143,7 @@ class SmixWebSocketServer
         if ($message == "monitoring") {
             $this->outputData($cid, json_encode($this->socketStatistics($cid), JSON_UNESCAPED_UNICODE), false);
         } else {
-            Helper::printer("Message from $cid [" . strlen($message) . "]: $message");
+            Helper::printer("Message from $cid [" . strlen($message) . "]: " . substr($message, 0, 100));
             $this->onMessage($cid, $message);
         }
     }
@@ -178,9 +171,10 @@ class SmixWebSocketServer
     protected function socketStatistics($cid)
     {
         return [
-            "SocketConnections"    => count($this->connections),
-            "SocketActive"         => count($this->active),
-            "MaxSocketConnections" => $this->maxConnections,
+            "Websocket Daemon Alive  "  => time() - $this->started,
+            "Socket Used Connections "  => count($this->connections),
+            "Socket Active Connection"  => count($this->active),
+            "Max Socket Connections  "  => $this->maxConnections,
         ];
     }
 
@@ -210,7 +204,7 @@ class SmixWebSocketServer
     {
         Server::write($this->connections[$cid]['resource'], $data, $this->lengthInitiatorNumber);
 
-        if ($logging) Helper::printer("Response: $data");
+        if ($logging) Helper::printer("Response: " . \substr($data, 0, 100));
 
         unset($this->active[$cid]);
 

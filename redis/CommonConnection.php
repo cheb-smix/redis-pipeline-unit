@@ -26,6 +26,7 @@ class CommonConnection
     protected $_pool = [];
     protected $lastErrorCode;
     protected $lastErrorDescr;
+    protected $logStringLimit = 0;
 
     public function __construct($config = [])
     {
@@ -101,11 +102,11 @@ class CommonConnection
 
         $cnt = count($commands);
 
-        $command = implode("\n", $commands) . "\n";
+        $command = $this->buildCommand($commands, false);
 
         $written = $this->clientClassName::write($this->socket, $command, 0, true);
 
-        Helper::printer("Written: [$written] $command");
+        Helper::printer("Written: [$written] " . ($this->logStringLimit ? \substr($command, 0, $this->logStringLimit) : $command));
 
         if ($written === false) {
             throw new \Exception("Failed to write to socket.\nRedis command was: " . $command);
@@ -122,8 +123,6 @@ class CommonConnection
         $result = [];
 
         while ($cnt) {
-            Helper::printer("Reading: $cnt");
-
             $line = trim($this->clientClassName::readline($this->socket), "\r\n");
 
             if ($line === false) {
@@ -133,8 +132,6 @@ class CommonConnection
             $type = $line[0];
             $line = mb_substr($line, 1, null, '8bit');
 
-            Helper::printer("Readline result: $line, type: $type");
-
             if ($type == '+') {
                 if ($line === 'OK' || $line === 'PONG') {
                     $result[] = true;
@@ -142,6 +139,7 @@ class CommonConnection
                     $result[] = $line;
                 }
             } elseif ($type == '-') {
+                Helper::printer("Redis responce error: $line");
                 $result[] = null;
             } elseif ($type == ':') {
                 $result[] = $line;
@@ -173,8 +171,6 @@ class CommonConnection
                         $result[] = mb_substr($data, 0, -2, '8bit');
                     }
                 }
-                Helper::printer("BULK");
-                Helper::printer($result, true);
 
             } elseif ($type == '*') {
                 $count = (int) $line;
@@ -184,7 +180,7 @@ class CommonConnection
                 }
                 $result[] = $data;
             } else {
-                Helper::printer("Redis error: $line");
+                Helper::printer("Redis incorrect command: $line");
                 $result[] = null;
             }
 
@@ -192,5 +188,25 @@ class CommonConnection
         }
         
         return $result;
+    }
+
+    protected function buildCommand($cmds, $useRedisFormat = false)
+    {
+        $endLine = "\n";
+
+        if (!$useRedisFormat) {
+            return implode($endLine, $cmds) . $endLine;
+        }
+
+        $command = "";
+        foreach ($cmds as $cmd) {
+            $cmd = explode(" ", $cmd);
+            $command .= '*' . count($cmd) . $endLine;
+            foreach ($cmd as $arg) {
+                $command .= '$' . mb_strlen($arg, '8bit') . $endLine . $arg . $endLine;
+            }
+        }
+
+        return $command;
     }
 }

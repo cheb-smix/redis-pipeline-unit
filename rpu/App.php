@@ -7,6 +7,7 @@ class App
     const CLIENT_MODE = 1;
     const SERVER_MODE = 5;
     const MONITOR_MODE = 9;
+    const DOS_MODE = 10;
 
     private $mode;
     private $config = [];
@@ -36,7 +37,7 @@ class App
             }
         }
 
-        foreach (["client", "server", "monitor"] as $mode) {
+        foreach (["client", "server", "monitor", "dos"] as $mode) {
             if (isset($this->argv[$mode])) {
                 $this->mode = constant(self::class . "::" . \strtoupper($mode) . "_MODE");
                 break;
@@ -65,6 +66,27 @@ class App
             define("DEBUG_MESSAGES", $this->config["client_debug_messages_on"]);
 
             (new WSClient())->init($this->config)->run($this->argv);
+
+        } elseif ($this->mode === self::CLIENT_MODE) {
+
+            define("DEBUG_MESSAGES", $this->config["client_debug_messages_on"]);
+
+            (new WSClient())->init($this->config)->run($this->argv);
+
+        } elseif ($this->mode === self::DOS_MODE) {
+
+            define("DEBUG_MESSAGES", $this->config["client_debug_messages_on"]);
+
+            $requests = isset($this->argv["requests"]) ? $this->argv["requests"] : 1000;
+            $cnt = 0;
+            for ($i = 0; $i < $requests; $i++) {
+                $key = "key$i";
+                if (rand(0, 10) < 3) {
+                    $key = "MY_TEST_KEY" . rand(1, 20);
+                }
+                $cmd = "php index.php client key=$key > /dev/null 2>/dev/null &";
+                `$cmd`;
+            }
 
         }
     }
