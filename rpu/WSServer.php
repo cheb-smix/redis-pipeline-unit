@@ -16,7 +16,11 @@ class WSServer extends SmixWebSocketServer
     protected $pipeline = [];
     protected $pipewidth = 32;
     protected $pipelineMinClients = 50;
+
+    // Stats
     protected $TPC = 0;
+    protected $maxpipewidth = 0;
+    protected $totalExecTime = 0;
     protected $pipelineExecuted = 0;
     protected $commandsExecuted = 0;
     protected $clientsProcessed = 0;
@@ -36,9 +40,14 @@ class WSServer extends SmixWebSocketServer
 
     protected function onLoop()
     {
+        // usleep(1000);
         $connectionsCnt = count($this->connections);
 
-        // $this->pipewidth = ceil($connectionsCnt / 10);
+        $this->pipewidth = ceil($connectionsCnt / 10);
+
+        if ($this->maxpipewidth < $this->pipewidth) {
+            $this->maxpipewidth = $this->pipewidth;
+        }
 
         foreach ($this->pipeline as $dbnum => $requests) {
             if (!$requests) {
@@ -77,7 +86,7 @@ class WSServer extends SmixWebSocketServer
         }
 
         
-        $results = $this->redis->pipeline($this->rebuildCommands($cmds));
+        $results = $this->redis->pipeline($cmds);
 
         if ($shift) array_shift($results);
 
@@ -98,14 +107,12 @@ class WSServer extends SmixWebSocketServer
         $this->pipelineExecuted++;
         $this->commandsExecuted += count($cmds);
 
-        $currentTPC = (microtime(true) - $start) / count($cmds);
-        Helper::printer("Pipelined in $currentTPC microseconds");
+        $executionTime = microtime(true) - $start;
+        Helper::printer("Pipelined in " . round($executionTime, 6) . " seconds");
 
-        if ($this->TPC) {
-            $this->TPC = round(($currentTPC + $this->TPC) / 2, 1000000);
-        } else {
-            $this->TPC = round($currentTPC, 1000000);
-        }
+        $this->totalExecTime += $executionTime;
+        
+        $this->TPC = round($this->totalExecTime / $this->commandsExecuted, 6);
     }
 
     protected function onOpen($cid)
@@ -159,28 +166,15 @@ class WSServer extends SmixWebSocketServer
             "Current Unique Requests "  => array_sum(array_map(function ($dbreq) {
                 return count($dbreq);
             }, $this->pipeline)),
+            "Max Pipeline Width      "  => $this->maxpipewidth,
             "Current Pipeline Width  "  => $this->pipewidth,
             "Current Pipeline Size   "  => count($this->pipeline),
+            "Total Execution Time    "  => round($this->totalExecTime, 6),
             "Seconds Per Request     "  => $this->TPC,
             "Total Pipeline Executed "  => $this->pipelineExecuted,
             "Total Commands Executed "  => $this->commandsExecuted,
             "Total Clients Processed "  => $this->clientsProcessed,
         ];
-    }
-
-    protected function rebuildCommands($cmds)
-    {
-        $endLine = "\r\n";
-
-        foreach ($cmds as &$cmd) {
-            $cmd = explode(" ", $cmd);
-            $command = '*' . count($cmd) . $endLine;
-            foreach ($cmd as $arg) {
-                $command .= '$' . mb_strlen($arg, '8bit') . $endLine . $arg . $endLine;
-            }
-            $cmd = $command;
-        }
-        return $cmds;
     }
 
 }

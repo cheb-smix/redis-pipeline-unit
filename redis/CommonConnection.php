@@ -26,6 +26,7 @@ class CommonConnection
     protected $_pool = [];
     protected $lastErrorCode;
     protected $lastErrorDescr;
+    protected $logStringLimit = 0;
 
     public function __construct($config = [])
     {
@@ -101,11 +102,11 @@ class CommonConnection
 
         $cnt = count($commands);
 
-        $command = implode("\n", $commands) . "\n";
+        $command = $this->buildCommand($commands, false);
 
         $written = $this->clientClassName::write($this->socket, $command, 0, true);
 
-        Helper::printer("Written: [$written] " . \substr($command, 0, 100));
+        Helper::printer("Written: [$written] " . ($this->logStringLimit ? \substr($command, 0, $this->logStringLimit) : $command));
 
         if ($written === false) {
             throw new \Exception("Failed to write to socket.\nRedis command was: " . $command);
@@ -187,5 +188,25 @@ class CommonConnection
         }
         
         return $result;
+    }
+
+    protected function buildCommand($cmds, $useRedisFormat = false)
+    {
+        $endLine = "\n";
+
+        if (!$useRedisFormat) {
+            return implode($endLine, $cmds) . $endLine;
+        }
+
+        $command = "";
+        foreach ($cmds as $cmd) {
+            $cmd = explode(" ", $cmd);
+            $command .= '*' . count($cmd) . $endLine;
+            foreach ($cmd as $arg) {
+                $command .= '$' . mb_strlen($arg, '8bit') . $endLine . $arg . $endLine;
+            }
+        }
+
+        return $command;
     }
 }
