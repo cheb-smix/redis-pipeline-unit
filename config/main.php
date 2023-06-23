@@ -14,6 +14,6 @@ return [
     "chunkSize" => 8192,
     "pipewidth" => 2,
     "pipelineMinClients" => 1,
-    "compressEnabled" => false,
-    "client_debug_messages_on" => true,
+    "compressEnabled" => true,
+    "client_debug_messages_on" => false,
 ];

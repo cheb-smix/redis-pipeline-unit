@@ -20,8 +20,7 @@ class WSClient extends SmixWebSocketClient
 
         $value = str_repeat("1", 10000);
 
-        // Helper::printer($this->send("SET $key $value" . date("0YmdHis") . " NX 36000"));
-        // Helper::printer($this->send("GET $key"));
+        Helper::printer($this->send("SET $key $value" . date("0YmdHis") . " NX 36000"));
         Helper::printer($this->send("GET $key"));
 
         // while (true)

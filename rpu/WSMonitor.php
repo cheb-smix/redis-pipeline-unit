@@ -7,17 +7,17 @@ use websocket\SmixWebSocketClient;
 
 class WSMonitor extends SmixWebSocketClient
 {
-    public function __construct(array &$config = [])
+    public function run($argv = [])
     {
         $config["debugMessagesOn"] = true;
-        parent::__construct($config);
-        
+        parent::run();
+
         while (true)
         {
             if (!$data = $this->send("monitoring")) {
                 break;
             } else {
-                SmixConsoleLogger::statistics($data);
+                SmixConsoleLogger::statistics(json_decode($data, true));
                 sleep(1);
             }
         }

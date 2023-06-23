@@ -78,8 +78,6 @@ class SmixWebSocketServer
                 continue;
             }
 
-            Helper::printer("Loop");
-
             if (in_array($this->socket, $read)) {
                 if (
                     ($connection = Server::accept($this->socket, $this->connectionTimeout, $peer_name)) 
@@ -103,9 +101,6 @@ class SmixWebSocketServer
             foreach($read as $connection) {
 
                 $data = Server::read($connection, $this->lengthInitiatorNumber);
-                if ($this->compressEnabled) {
-                    // $data = @gzinflate($data);
-                }
 
                 $cid = $this->getConnectionID($connection);
 
@@ -153,7 +148,7 @@ class SmixWebSocketServer
         $cid = $this->getConnectionID($connection);
         $this->active[$cid] = $cid;
         if ($message == "monitoring") {
-            $this->outputData($cid, $this->socketStatistics($cid), false);
+            $this->outputData($cid, json_encode($this->socketStatistics($cid), JSON_UNESCAPED_UNICODE), false);
         } else {
             Helper::printer("Message from $cid [" . strlen($message) . "]: $message");
             $this->onMessage($cid, $message);
