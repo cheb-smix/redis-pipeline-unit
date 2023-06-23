@@ -3,9 +3,10 @@
 namespace redis;
 
 use rpu\Helper;
-use websocket\SocketClient as Client;
+use websocket\SocketClient;
+use websocket\StreamClient;
 
-class ConnectionV2
+class CommonConnection
 {
     public $hostname = 'localhost';
     public $port = 6379;
@@ -14,14 +15,17 @@ class ConnectionV2
     public $database = 0;
     public $connectionTimeout;
     public $dataTimeout;
-    public $useSSL = false;
-    public $socketClientFlags = STREAM_CLIENT_CONNECT;
     public $retries = 0;
     public $retryInterval = 0;
+    public $socketClientFlags;
 
-    private $connectionString;
-    private $socket = false;
-    private $_pool = [];
+    protected $connectionCharsAdd = 2;
+    protected $clientClassName;
+    protected $connectionString;
+    protected $socket = false;
+    protected $_pool = [];
+    protected $lastErrorCode;
+    protected $lastErrorDescr;
 
     public function __construct($config = [])
     {
@@ -29,22 +33,6 @@ class ConnectionV2
             if (isset($this->$k)) $this->$k = $v;
         }
         $this->connectionString = $this->getConnectionString();
-    }
-
-    public function __sleep()
-    {
-        $this->close();
-        return array_keys(get_object_vars($this));
-    }
-
-    public function __call($name, $params)
-    {
-        $redisCommand = strtoupper($this->camel2words($name, false));
-        if (isset(REDIS_COMMANDS[$redisCommand])) {
-            return $this->executeCommand($redisCommand, $params);
-        }
-
-        return parent::__call($name, $params);
     }
 
     public function getConnectionString()
@@ -64,14 +52,21 @@ class ConnectionV2
 
         $errno = $errstr = null;
 
-        if ($this->socket = Client::connect($this->hostname, $this->port, $errno, $errstr)) {
+        $this->socket = $this->clientClassName::connect(
+            $this->hostname, 
+            $this->port, 
+            $this->lastErrorCode, 
+            $this->lastErrorDescr, 
+            $this->connectionTimeout ?: ini_get('default_socket_timeout'), 
+            $this->socketClientFlags
+        );
 
+        if ($this->socket) {
             $this->_pool[ $this->connectionString ] = $this->socket;
-
             if ($this->password !== null) {
-                $this->pipeline(['AUTH ' .$this->password]);
+                $this->pipeline(['AUTH ' . $this->password]);
             }
-
+            Helper::printer("Redis connected to $this->hostname/$this->port using $this->clientClassName class");
         } else {
             throw new \Exception("Failed to open DB connection. $errstr [$errno]");
         }
@@ -87,12 +82,12 @@ class ConnectionV2
                 $success = false;
             }
 
-            // if (Client::close($socket)) {
+            // if ($this->clientClassName::close($socket)) {
             //     $success = $success ?? true;
             // } else {
             //     $success = $success ?? false;
             // }
-            $success = $success ?? (bool) Client::close($socket);
+            $success = $success ?? (bool) $this->clientClassName::close($socket);
         }
 
         $this->_pool = [];
@@ -106,9 +101,9 @@ class ConnectionV2
 
         $cnt = count($commands);
 
-        $command = " " . implode("\r\n ", $commands);
+        $command = implode("\n", $commands) . "\n";
 
-        $written = Client::write($this->socket, $command, 0, true);
+        $written = $this->clientClassName::write($this->socket, $command, 0, true);
 
         Helper::printer("Written: [$written] $command");
 
@@ -122,21 +117,21 @@ class ConnectionV2
         return $this->parsePipeline($command, $cnt);
     }
 
-    private function parsePipeline($command = null, $cnt = 0)
+    protected function parsePipeline($command = null, $cnt = 0)
     {
         $result = [];
 
         while ($cnt) {
             Helper::printer("Reading: $cnt");
 
-            $line = preg_replace("/[\r\n]/", "", Client::readline($this->socket));
+            $line = trim($this->clientClassName::readline($this->socket), "\r\n");
 
             if ($line === false) {
-                $result[] = null;
+                return null;
             }
 
             $type = $line[0];
-            $line = substr($line, 1);
+            $line = mb_substr($line, 1, null, '8bit');
 
             Helper::printer("Readline result: $line, type: $type");
 
@@ -155,9 +150,28 @@ class ConnectionV2
                 if ($line == '-1') {
                     $result[] = null;
                 } else {
-                    Client::readline($this->socket);
-                    $result[] = Client::readline($this->socket);
-                    Client::readline($this->socket);
+                    $length = (int)$line + $this->connectionCharsAdd;
+                    $data = '';
+                    while ($length > 0) {
+                        if (($block = $this->clientClassName::read($this->socket, $length, true)) === false) {
+                            Helper::printer("Failed to read from socket.\nRedis command was: " . "[" . strlen($command) . "]" . $command);
+                            $data = null;
+                            break;
+                        } else {
+                            if ($block[0] == "\n") {
+                                $data .= mb_substr($block, 1, null, '8bit');
+                            } else {
+                                $data .= $block;
+                            }
+                            $length -= mb_strlen($block, '8bit');
+                        }
+                    }
+    
+                    if ($data === null) {
+                        $result[] = $data;
+                    } else {
+                        $result[] = mb_substr($data, 0, -2, '8bit');
+                    }
                 }
                 Helper::printer("BULK");
                 Helper::printer($result, true);
@@ -170,36 +184,13 @@ class ConnectionV2
                 }
                 $result[] = $data;
             } else {
+                Helper::printer("Redis error: $line");
                 $result[] = null;
             }
-
-            
 
             $cnt--;
         }
         
         return $result;
-    }
-
-    public function camel2words($name, $ucwords = true)
-    {
-        $label = mb_strtolower(trim(str_replace([
-            '-',
-            '_',
-            '.',
-        ], ' ', preg_replace('/(?<!\p{Lu})(\p{Lu})|(\p{Lu})(?=\p{Ll})/u', ' \0', $name))), self::encoding());
-
-        return $ucwords ? $this->mb_ucwords($label, self::encoding()) : $label;
-    }
-
-    public function mb_ucwords($string, $encoding = 'UTF-8')
-    {
-        $words = preg_split("/\s/u", $string, -1, PREG_SPLIT_NO_EMPTY);
-
-        $titelized = array_map(function ($word) use ($encoding) {
-            return static::mb_ucfirst($word, $encoding);
-        }, $words);
-
-        return implode(' ', $titelized);
     }
 }

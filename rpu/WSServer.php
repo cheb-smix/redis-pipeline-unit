@@ -3,11 +3,13 @@
 namespace rpu;
 
 use websocket\SmixWebSocketServer;
-use redis\ConnectionV2 as RedisClient;
+use redis\SocketConnection;
+use redis\StreamConnection;
 
 class WSServer extends SmixWebSocketServer
 {
     public $redis;
+    public $redisConnectionClassName = '\redis\SocketConnection';
 
     protected $currentDatabase = 0;
     protected $connected = false;
@@ -63,7 +65,8 @@ class WSServer extends SmixWebSocketServer
         }
 
         if (!$this->connected) {
-            $this->redis = new RedisClient($this->redis);
+            
+            $this->redis = new $this->redisConnectionClassName($this->redis);
             $this->connected = true;
         }
 
