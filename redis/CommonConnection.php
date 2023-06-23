@@ -105,7 +105,7 @@ class CommonConnection
 
         $written = $this->clientClassName::write($this->socket, $command, 0, true);
 
-        Helper::printer("Written: [$written] $command");
+        Helper::printer("Written: [$written] " . \substr($command, 0, 100));
 
         if ($written === false) {
             throw new \Exception("Failed to write to socket.\nRedis command was: " . $command);
@@ -122,8 +122,6 @@ class CommonConnection
         $result = [];
 
         while ($cnt) {
-            Helper::printer("Reading: $cnt");
-
             $line = trim($this->clientClassName::readline($this->socket), "\r\n");
 
             if ($line === false) {
@@ -133,8 +131,6 @@ class CommonConnection
             $type = $line[0];
             $line = mb_substr($line, 1, null, '8bit');
 
-            Helper::printer("Readline result: $line, type: $type");
-
             if ($type == '+') {
                 if ($line === 'OK' || $line === 'PONG') {
                     $result[] = true;
@@ -142,6 +138,7 @@ class CommonConnection
                     $result[] = $line;
                 }
             } elseif ($type == '-') {
+                Helper::printer("Redis responce error: $line");
                 $result[] = null;
             } elseif ($type == ':') {
                 $result[] = $line;
@@ -173,8 +170,6 @@ class CommonConnection
                         $result[] = mb_substr($data, 0, -2, '8bit');
                     }
                 }
-                Helper::printer("BULK");
-                Helper::printer($result, true);
 
             } elseif ($type == '*') {
                 $count = (int) $line;
@@ -184,7 +179,7 @@ class CommonConnection
                 }
                 $result[] = $data;
             } else {
-                Helper::printer("Redis error: $line");
+                Helper::printer("Redis incorrect command: $line");
                 $result[] = null;
             }
 
