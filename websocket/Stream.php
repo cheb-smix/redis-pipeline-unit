@@ -10,8 +10,12 @@ class StreamCommon implements \websocket\CommonInterface
         return @fgets($socket);
     }
 
-    public static function read(&$socket, int $lengthInitiatorNumber = 9)
+    public static function read(&$socket, int $lengthInitiatorNumber = 9, bool $clearly = false)
     {
+        if ($clearly) {
+            return fread($socket, $lengthInitiatorNumber);
+        }
+
         if ($length = (int) fread($socket, $lengthInitiatorNumber)) {
             return fread($socket, $length);
         }
@@ -19,9 +23,13 @@ class StreamCommon implements \websocket\CommonInterface
         return false;
     }
 
-    public static function write(&$socket, $data, int $lengthInitiatorNumber = 9)
+    public static function write(&$socket, $data, int $lengthInitiatorNumber = 9, bool $clearly = false)
     {
-        if (!$data) $data = 0;
+        if ($clearly) {
+            return fwrite($socket, $data, \strlen($data));
+        }
+
+        if (!$data) $data = "0";
 
         if ($length = strlen($data)) {
             return fwrite($socket, sprintf("%0{$lengthInitiatorNumber}d", $length) . $data, $length + $lengthInitiatorNumber);
@@ -109,5 +117,13 @@ class StreamServer extends StreamCommon implements ServerInterface
     public static function accept(&$socket, $timeout = 0, &$peer_name)
     {
         return stream_socket_accept($socket, $timeout, $peer_name);
+    }
+}
+
+class StreamClient extends StreamCommon implements \websocket\ClientInterface
+{
+    public static function connect($hostname, $port, &$errno, &$errstr, $timeout = 0, $flags = null)
+    {
+        return @stream_socket_client("tcp://$hostname:$port", $errno, $errstr, $timeout, $flags);
     }
 }

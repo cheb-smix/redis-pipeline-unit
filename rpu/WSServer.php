@@ -3,17 +3,20 @@
 namespace rpu;
 
 use websocket\SmixWebSocketServer;
-use redis\ConnectionV2 as RedisClient;
+use redis\SocketConnection;
+use redis\StreamConnection;
 
 class WSServer extends SmixWebSocketServer
 {
     public $redis;
+    public $redisConnectionClassName = '\redis\SocketConnection';
 
     protected $currentDatabase = 0;
     protected $connected = false;
     protected $pipeline = [];
     protected $pipewidth = 32;
     protected $pipelineMinClients = 50;
+    protected $TPC = 0;
 
     public function __destruct()
     {
@@ -53,6 +56,7 @@ class WSServer extends SmixWebSocketServer
 
     protected function executePipeline($dbnum)
     {
+        $start = \microtime(true);
         $cmds = array_column($this->pipeline[$dbnum], "request");
         $shift = false;
 
@@ -63,7 +67,8 @@ class WSServer extends SmixWebSocketServer
         }
 
         if (!$this->connected) {
-            $this->redis = new RedisClient($this->redis);
+            
+            $this->redis = new $this->redisConnectionClassName($this->redis);
             $this->connected = true;
         }
 
@@ -83,6 +88,13 @@ class WSServer extends SmixWebSocketServer
                 }
             }
             $reqIndex++;
+        }
+        $end = \microtime(true);
+
+        if ($this->TPC) {
+            $this->TPC = round((($end - $start) / count($cmds) + $this->TPC) / 2, 1000000);
+        } else {
+            $this->TPC = round(($end - $start) / count($cmds), 1000000);
         }
     }
 
@@ -139,6 +151,7 @@ class WSServer extends SmixWebSocketServer
             "TotalRequestsCount"    => array_sum(array_map(function ($dbreq) {
                 return count($dbreq);
             }, $this->pipeline)),
+            "UsecPerRequest"        => $this->TPC,
         ];
     }
 

@@ -4,8 +4,8 @@ namespace websocket;
 interface CommonInterface
 {
     public static function readline(&$socket);
-    public static function read(&$socket, int $lengthInitiatorNumber = 9);
-    public static function write(&$socket, $data, int $lengthInitiatorNumber = 9);
+    public static function read(&$socket, int $lengthInitiatorNumber = 9, bool $clearly = false);
+    public static function write(&$socket, $data, int $lengthInitiatorNumber = 9, bool $clearly = false);
     public static function send(&$socket, $data, int $lengthInitiatorNumber = 9);
     public static function close(&$connection);
     public static function handshake(&$socket, int $lengthInitiatorNumber = 9);
@@ -22,5 +22,5 @@ interface ServerInterface
 
 interface ClientInterface
 {
-    public static function connect($hostname, $port, &$errno, &$errstr, $timeout = 0);
+    public static function connect($hostname, $port, &$errno, &$errstr, $timeout = 0, $flags = null);
 }

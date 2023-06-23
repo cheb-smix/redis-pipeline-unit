@@ -140,12 +140,16 @@ class SocketServer extends SocketCommon implements \websocket\ServerInterface
 
 class SocketClient extends SocketCommon implements \websocket\ClientInterface
 {
-    public static function connect($hostname, $port, &$errno, &$errstr, $timeout = 0)
+    public static function connect($hostname, $port, &$errno, &$errstr, $timeout = 0, $flags = null)
     {
         if (!$socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP)) {
+            $errno = socket_last_error($socket);
+            $errstr = socket_strerror($errno);
             return false;
         }
         if (!socket_connect($socket, $hostname, $port)) {
+            $errno = socket_last_error($socket);
+            $errstr = socket_strerror($errno);
             return false;
         }
         return $socket;
