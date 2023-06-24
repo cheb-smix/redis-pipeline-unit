@@ -7,7 +7,7 @@ class SocketCommon implements \websocket\CommonInterface
 {
     public static function readline(&$socket)
     {
-        return @socket_read($socket, 1000, PHP_NORMAL_READ);
+        return @socket_read($socket, 1024, PHP_NORMAL_READ);
     }
 
     public static function read(&$socket, int $lengthInitiatorNumber = 9, bool $clearly = false)

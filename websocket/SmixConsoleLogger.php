@@ -57,7 +57,7 @@ class SmixConsoleLogger
             return;
         }
 
-        echo self::multilined($data);
+        echo self::tablelized($data);
     }
 
     private static function multilined($data = [])
@@ -70,4 +70,62 @@ class SmixConsoleLogger
         . "\e[1;36m--- WEBSOCKET DAEMON MONITORING TOOL ---\e[0m\n"
         . "\e[0;33m" . implode("\n", $data) . "\n\e[0m";
     }
+
+    private static function tablelized($data = [])
+    {
+        $cols = count($data);
+        if ($cols > 3) {
+            $cols = 3;
+        }
+        $keyAppend = 25;
+        $maxValAppend = 30;
+        $maxRowsNum = 0;
+
+        $valWidths = [];
+
+        foreach ($data as $colname => $col) {
+            if ($maxRowsNum < count($col)) {
+                $maxRowsNum = count($col);
+            }
+            $valWidths[$colname] = 3;
+
+            foreach ($col as $k => $v) {
+                $vlen = strlen((string) $v);
+                if ($vlen > $valWidths[$colname] && $vlen <= $maxValAppend) {
+                    $valWidths[$colname] = $vlen;
+                }
+            }
+        }
+
+        $tableWidth = ($keyAppend + 6) * $cols + array_sum($valWidths) + 1;
+
+        $header = "--- WEBSOCKET DAEMON MONITORING TOOL ---";
+        $headerPrepend = (int) floor((($tableWidth - 2) / 2) + strlen($header) / 2);
+
+        $output = chr(27) . chr(91) . 'H' . chr(27) . chr(91) . 'J';
+        $output .= "|" . str_repeat("¯", $tableWidth - 2) . "|\n";
+        $output .= "|\e[1;36m" . sprintf("%{$headerPrepend}s", $header) . str_repeat(" ", $tableWidth - 2 - $headerPrepend) . "\e[0m|\n";
+        $output .= "|" . str_repeat("-", $tableWidth - 2) . "|\n";
+        foreach ($data as $colname => $col) {
+            $colAppend = $keyAppend + $valWidths[$colname] + 3;
+            $output .= "| " . sprintf("%-{$colAppend}s", $colname) . " ";
+        }
+        $output .= "|\n";
+        $output .= "|" . str_repeat("-", $tableWidth - 2) . "|\n";
+        for ($i = 0; $i < $maxRowsNum; $i++) {
+            foreach ($data as $colname => &$col) {
+                $val = $i ? next($col) : current($col);
+                $key = key($col);
+                if ($key) {
+                    $output .= "| \e[0;33m" . sprintf("%-{$keyAppend}s", $key) . " = " . sprintf("%-{$valWidths[$colname]}s", $val) . "\e[0m ";
+                } else {
+                    $output .= "| " . str_repeat(" ", $keyAppend + $valWidths[$colname] + 3) . " ";
+                }
+            }
+            $output .= "|\n";
+        }
+        $output .= "|" . str_repeat("_", $tableWidth - 2) . "|\n";
+
+        return $output;
+    } 
 }

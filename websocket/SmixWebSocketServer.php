@@ -8,12 +8,11 @@ use websocket\SocketServer as Server;
 class SmixWebSocketServer
 {
     public $compressEnabled = false;
-    public $compressMinLength = 2048;
+    public $compressMinLength = 3564;
     public $scheme = "tcp";
     public $hostname = "localhost";
     public $port = 1988;
     public $connectionTimeout = 5;
-    public $chunkSize = 8192;
     public $secretkey = "jhdfgjkdhg;ldhg;ohgoheoghnherd75d449dtp84su8lj98t4hnm9";
     public $debugMessagesOn = true;
     public $lengthInitiatorNumber = 9;
@@ -171,7 +170,7 @@ class SmixWebSocketServer
     protected function socketStatistics($cid)
     {
         return [
-            "Websocket Daemon Alive  "  => time() - $this->started,
+            "Websocket Daemon Alive  "  => Helper::formatTime(time() - $this->started),
             "Socket Used Connections "  => count($this->connections),
             "Socket Active Connection"  => count($this->active),
             "Max Socket Connections  "  => $this->maxConnections,
@@ -209,20 +208,6 @@ class SmixWebSocketServer
         unset($this->active[$cid]);
 
         return true;
-    }
-
-    private function getChunksSizes($length = 0)
-    {
-        $a = [];
-        while ($length > 0) {
-            if ($length >= $this->chunkSize) {
-                $a[] = $this->chunkSize;
-            } else {
-                $a[] = $length;
-            }
-            $length -= $this->chunkSize;
-        }
-        return $a;
     }
 
 }

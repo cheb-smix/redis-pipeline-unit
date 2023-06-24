@@ -17,10 +17,11 @@ class CommonConnection
     public $dataTimeout;
     public $retries = 0;
     public $retryInterval = 0;
+    public $useRedisFormat = false;
     public $socketClientFlags;
 
-    protected $connectionCharsAdd = 2;
-    protected $clientClassName;
+    public $clientClassName;
+
     protected $connectionString;
     protected $socket = false;
     protected $_pool = [];
@@ -102,7 +103,7 @@ class CommonConnection
 
         $cnt = count($commands);
 
-        $command = $this->buildCommand($commands, false);
+        $command = $this->buildCommand($commands);
 
         $written = $this->clientClassName::write($this->socket, $command, 0, true);
 
@@ -122,15 +123,32 @@ class CommonConnection
     {
         $result = [];
 
-        while ($cnt) {
-            $line = trim($this->clientClassName::readline($this->socket), "\r\n");
+        while ($cnt--) {
+            Helper::printer("Reading $cnt responce");
 
-            if ($line === false) {
-                return null;
+            $line = $this->clientClassName::readline($this->socket);
+
+            $lineBreaker = mb_substr($line, -1, 1, '8bit') == "\n";
+  
+            $line = trim($line, "\r\n");
+
+            if (!$line) {
+                $cnt++;
+                Helper::printer("Redis EMPTY!");
+                while ($cnt--) {
+                    $result[] = null;
+                }
+                break;
             }
 
             $type = $line[0];
             $line = mb_substr($line, 1, null, '8bit');
+
+            Helper::printer("Redis responce inbound: [ type: " . var_export($type, true) . ", line: " . var_export($line, true) . "]");
+
+            if (!$lineBreaker) {
+                $this->clientClassName::read($this->socket, 1, true); // just for reading next \n symbol after \r
+            }
 
             if ($type == '+') {
                 if ($line === 'OK' || $line === 'PONG') {
@@ -148,7 +166,7 @@ class CommonConnection
                 if ($line == '-1') {
                     $result[] = null;
                 } else {
-                    $length = (int)$line + $this->connectionCharsAdd;
+                    $length = (int)$line + 2;
                     $data = '';
                     while ($length > 0) {
                         if (($block = $this->clientClassName::read($this->socket, $length, true)) === false) {
@@ -180,21 +198,21 @@ class CommonConnection
                 }
                 $result[] = $data;
             } else {
-                Helper::printer("Redis incorrect command: $line");
+                Helper::printer("Redis unhandled responce: [ type: " . var_export($type, true) . ", line: " . var_export($line, true) . "]");
                 $result[] = null;
             }
 
-            $cnt--;
+            // $cnt--;
         }
         
         return $result;
     }
 
-    protected function buildCommand($cmds, $useRedisFormat = false)
+    protected function buildCommand($cmds)
     {
         $endLine = "\n";
 
-        if (!$useRedisFormat) {
+        if (!$this->useRedisFormat) {
             return implode($endLine, $cmds) . $endLine;
         }
 
