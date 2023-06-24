@@ -57,18 +57,26 @@ class SmixConsoleLogger
             return;
         }
 
+        foreach ($data as &$col) {
+            ksort($col);
+        }
+
         echo self::tablelized($data);
     }
 
     private static function multilined($data = [])
     {
-        array_walk($data, function (&$v, $k) {
-            $v = "$k = $v";
-        });
+        $tmp = [];
+        foreach ($data as $c => $col) {
+            $tmp[] = $c;
+            foreach ($col as $k => $v) {
+                $tmp[] = "$k = $v";
+            }
+        }
 
         return chr(27) . chr(91) . 'H' . chr(27) . chr(91) . 'J' 
         . "\e[1;36m--- WEBSOCKET DAEMON MONITORING TOOL ---\e[0m\n"
-        . "\e[0;33m" . implode("\n", $data) . "\n\e[0m";
+        . "\e[0;33m" . implode("\n", $tmp) . "\n\e[0m";
     }
 
     private static function tablelized($data = [])

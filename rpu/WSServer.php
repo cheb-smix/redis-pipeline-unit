@@ -17,7 +17,7 @@ class WSServer extends SmixWebSocketServer
     protected $pipewidth = 2;
     protected $pipelineMinClients = 10;
 
-    // Stats
+    // Metrics
     protected $TPC = 0;
     protected $TPR = 0;
     protected $maxpipewidth = 0;
@@ -25,7 +25,6 @@ class WSServer extends SmixWebSocketServer
     protected $totalExecTime = 0;
     protected $pipelineExecuted = 0;
     protected $commandsExecuted = 0;
-    protected $clientsProcessed = 0;
 
     public function __destruct()
     {
@@ -42,10 +41,9 @@ class WSServer extends SmixWebSocketServer
 
     protected function onLoop()
     {
-        // usleep(1000);
         $connectionsCnt = count($this->connections);
 
-        // $this->pipewidth = ceil($connectionsCnt / 10);
+        $this->pipewidth = ceil($connectionsCnt / 10);
 
         if ($this->maxpipewidth < $this->pipewidth) {
             $this->maxpipewidth = $this->pipewidth;
@@ -161,7 +159,7 @@ class WSServer extends SmixWebSocketServer
 
     protected function onClose($cid)
     {
-        $this->clientsProcessed++;
+
     }
 
 
@@ -170,7 +168,7 @@ class WSServer extends SmixWebSocketServer
     protected function socketStatistics($cid)
     {
         return [
-            "Socket Statisticts" => parent::socketStatistics($cid) + [
+            "Socket Metrics" => parent::socketStatistics($cid) + [
                 "Current Unique Requests"   => array_sum(array_map(function ($requests) {
                     return count($requests);
                 }, $this->pipeline)),
@@ -187,7 +185,6 @@ class WSServer extends SmixWebSocketServer
                 "Total Pipeline Executed"   => $this->pipelineExecuted,
                 "Total Commands Executed"   => $this->commandsExecuted,
                 "Total Requests Processed"  => $this->totalRequests,
-                "Total Clients Processed"   => $this->clientsProcessed,
             ],
             "Common Parameters" => [
                 "PHP Memory Usage"          => Helper::formatBytes(memory_get_usage()),
