@@ -107,8 +107,6 @@ class SocketServer extends SocketCommon implements \websocket\ServerInterface
             return false;
         }
 
-        // socket_set_option($socket, SOL_SOCKET, SO_LINGER, ['l_linger' => 0, 'l_onoff' => 1]);
-
         return $socket;
     }
 

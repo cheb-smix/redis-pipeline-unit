@@ -23,7 +23,12 @@ class SmixWebSocketServer
     protected $maxConnections = 0;
     protected $connections = [];
     protected $active = [];
+
+    // Metrics
+    protected $monitorers = [];
     protected $started = 0;
+    protected $avgSessionTime = 0;
+    protected $clientsProcessed = 0;
 
     public function __destruct()
     {
@@ -82,8 +87,10 @@ class SmixWebSocketServer
                     $cid = $this->getConnectionID($connection);
 
                     $this->connections[$cid] = [
-                        "resource"  => $connection,
-                        "peer_name" => $peer_name,
+                        "resource"      => $connection,
+                        "peer_name"     => $peer_name,
+                        "session_start" => microtime(true),
+                        "monitorer"     => false,
                     ];
 
                     $this->onSocketOpen($connection);
@@ -130,18 +137,40 @@ class SmixWebSocketServer
     private function onSocketClose($connection)
     {
         $cid = $this->getConnectionID($connection);
-        $this->onClose($cid);
-        unset($this->connections[$cid], $this->active[$cid]);
-        Helper::printer("Connection $cid has disconnected");
+
+        if ($this->connections[$cid]["monitorer"]) {
+
+            unset($this->connections[$cid], $this->monitorers[$cid]);
+            Helper::printer("Monitorer $cid has disconnected");
+
+        } else {
+
+            if ($this->avgSessionTime) {
+                $this->avgSessionTime = round(($this->avgSessionTime + microtime(true) - $this->connections[$cid]["session_start"]) / 2, 6);
+            } else {
+                $this->avgSessionTime = microtime(true) - $this->connections[$cid]["session_start"];
+            }
+            $this->clientsProcessed++;
+
+            $this->onClose($cid);
+            unset($this->connections[$cid], $this->active[$cid]);
+            Helper::printer("Client $cid has disconnected");
+
+        }
     }
     
     private function onSocketMessage($connection, $message)
     {
         $cid = $this->getConnectionID($connection);
-        $this->active[$cid] = $cid;
+
         if ($message == "monitoring") {
+            if (!isset($this->monitorers[$cid])) {
+                $this->monitorers[$cid] = $cid;
+                $this->connections[$cid]["monitorer"] = true;
+            }
             $this->outputData($cid, json_encode($this->socketStatistics($cid), JSON_UNESCAPED_UNICODE), false);
         } else {
+            $this->active[$cid] = $cid;
             Helper::printer("Message from $cid [" . strlen($message) . "]: " . substr($message, 0, 100));
             $this->onMessage($cid, $message);
         }
@@ -171,9 +200,12 @@ class SmixWebSocketServer
     {
         return [
             "Websocket Daemon Alive  "  => Helper::formatTime(time() - $this->started),
-            "Socket Used Connections "  => count($this->connections),
-            "Socket Active Connection"  => count($this->active),
             "Max Socket Connections  "  => $this->maxConnections,
+            "Socket Used Connections "  => count($this->connections) - count($this->monitorers),
+            "Socket Active Connection"  => count($this->active),
+            "Average Session Time"      => $this->avgSessionTime,
+            "Total Clients Processed"   => $this->clientsProcessed,
+            "Monitorers Online"         => count($this->monitorers),
         ];
     }
 
