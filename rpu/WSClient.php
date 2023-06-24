@@ -19,7 +19,7 @@ class WSClient extends SmixWebSocketClient
         }
 
         $value = str_repeat("1", 10000);
-        $value = 'a:2:{i:0;a:1:{s:16:\"get_epg_category\";a:1:{i:0;i:105;}}i:1;N;}';
+        $value = json_encode(["SIMPLE EXAMPLE" => "SOME TEXT \r\n JUST with '' and & всяким так дерьмом"], JSON_HEX_APOS | JSON_UNESCAPED_UNICODE);
 
         Helper::printer($this->send("SET $key '$value' EX 36000"));
         Helper::printer($this->send("GET $key"));
@@ -31,3 +31,4 @@ class WSClient extends SmixWebSocketClient
         // }
     }
 }
+// JSON_HEX_APOS

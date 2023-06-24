@@ -8,12 +8,11 @@ use websocket\SocketClient as Client;
 class SmixWebSocketClient
 {
     public $compressEnabled = false;
-    public $compressMinLength = 2048;
+    public $compressMinLength = 2080;
     public $scheme = "tcp";
     public $hostname = "localhost";
     public $port = 1988;
     public $connectionTimeout = 5;
-    public $chunkSize = 8192;
     public $secretkey = "jhdfgjkdhg;ldhg;ohgoheoghnherd75d449dtp84su8lj98t4hnm9";
     public $debugMessagesOn = true;
     public $lengthInitiatorNumber = 9;

@@ -14,12 +14,14 @@ class WSServer extends SmixWebSocketServer
     protected $currentDatabase = 0;
     protected $connected = false;
     protected $pipeline = [];
-    protected $pipewidth = 32;
-    protected $pipelineMinClients = 50;
+    protected $pipewidth = 2;
+    protected $pipelineMinClients = 10;
 
     // Stats
     protected $TPC = 0;
+    protected $TPR = 0;
     protected $maxpipewidth = 0;
+    protected $totalRequests = 0;
     protected $totalExecTime = 0;
     protected $pipelineExecuted = 0;
     protected $commandsExecuted = 0;
@@ -43,7 +45,7 @@ class WSServer extends SmixWebSocketServer
         // usleep(1000);
         $connectionsCnt = count($this->connections);
 
-        $this->pipewidth = ceil($connectionsCnt / 10);
+        // $this->pipewidth = ceil($connectionsCnt / 10);
 
         if ($this->maxpipewidth < $this->pipewidth) {
             $this->maxpipewidth = $this->pipewidth;
@@ -93,6 +95,7 @@ class WSServer extends SmixWebSocketServer
         $reqIndex = 0;
 
         foreach ($this->pipeline[$dbnum] as $requestHash => $request) {
+            $this->totalRequests += $request["count"];
             foreach ($request["clients"] as $i => $cid) {
                 $this->outputData($cid, $results[$reqIndex]);
                 unset($this->pipeline[$dbnum][$requestHash]["clients"][$i]);
@@ -113,6 +116,7 @@ class WSServer extends SmixWebSocketServer
         $this->totalExecTime += $executionTime;
         
         $this->TPC = round($this->totalExecTime / $this->commandsExecuted, 6);
+        $this->TPR = round($this->totalExecTime / $this->totalRequests, 6);
     }
 
     protected function onOpen($cid)
@@ -122,9 +126,10 @@ class WSServer extends SmixWebSocketServer
 
     protected function onMessage($cid, $request)
     {
-        $parts = explode(" ", $request);
-        $cmd = array_shift($parts);
-        $key = array_shift($parts);
+        $index = strpos($request, " ");
+        $cmd = substr($request, 0, $index);
+        $key = substr($request, $index + 1, strpos($request, " ", $index + 1) - $index - 1);
+
         if (!isset(REDIS_COMMANDS[$cmd])) {
             $this->outputData($cid, false);
             return;
@@ -135,12 +140,14 @@ class WSServer extends SmixWebSocketServer
             }
             $this->connections[$cid]["current_database"] = $key;
         } 
+
         $dbnum = $this->connections[$cid]["current_database"];
+
         if ($cmd != "SELECT") {
             $requestHash = sha1("$cmd : $key");
 
             if (!isset($this->pipeline[$dbnum][$requestHash])) {
-                $this->pipeline[$dbnum][sha1("$cmd : $key")] = [
+                $this->pipeline[$dbnum][$requestHash] = [
                     "clients"   => [$cid],
                     "count"     => 1,
                     "request"   => $request,
@@ -162,18 +169,42 @@ class WSServer extends SmixWebSocketServer
 
     protected function socketStatistics($cid)
     {
-        return parent::socketStatistics($cid) + [
-            "Current Unique Requests "  => array_sum(array_map(function ($dbreq) {
-                return count($dbreq);
-            }, $this->pipeline)),
-            "Max Pipeline Width      "  => $this->maxpipewidth,
-            "Current Pipeline Width  "  => $this->pipewidth,
-            "Current Pipeline Size   "  => count($this->pipeline),
-            "Total Execution Time    "  => round($this->totalExecTime, 6),
-            "Seconds Per Request     "  => $this->TPC,
-            "Total Pipeline Executed "  => $this->pipelineExecuted,
-            "Total Commands Executed "  => $this->commandsExecuted,
-            "Total Clients Processed "  => $this->clientsProcessed,
+        return [
+            "Socket Statisticts" => parent::socketStatistics($cid) + [
+                "Current Unique Requests"   => array_sum(array_map(function ($requests) {
+                    return count($requests);
+                }, $this->pipeline)),
+                "Current Total Requests"    => array_sum(array_map(function ($requests) {
+                    return array_sum(array_column($requests, "count"));
+                }, $this->pipeline)),
+                "Current Database Acrive"   => $this->currentDatabase,
+                "Current Pipeline Width"    => $this->pipewidth,
+                "Current Pipeline Size"     => count($this->pipeline),
+                "Max PipelineWidth Reached" => $this->maxpipewidth,
+                "Time Per Redis Command"    => $this->TPC,
+                "Time Per Client Request"   => $this->TPR,
+                "Total Execution Time"      => round($this->totalExecTime, 6),
+                "Total Pipeline Executed"   => $this->pipelineExecuted,
+                "Total Commands Executed"   => $this->commandsExecuted,
+                "Total Requests Processed"  => $this->totalRequests,
+                "Total Clients Processed"   => $this->clientsProcessed,
+            ],
+            "Common Parameters" => [
+                "PHP Memory Usage"          => Helper::formatBytes(memory_get_usage()),
+                "CPU Usage"                 => (($load = Helper::getCPULoad()) ? round($load, 2) . "%" : "NaN"),
+                "Websocket Hostname"        => $this->addr,
+                "Compression Enabled"       => $this->compressEnabled ? "true" : "false",
+                "Compression Min Length"    => Helper::formatBytes($this->compressMinLength),
+                "Redis Connection Class"    => $this->redisConnectionClassName,
+            ] + (is_object($this->redis) ? [
+                "Redis Hostname"            => $this->redis->hostname . ":" . $this->redis->port,
+                "Redis Using Class"         => $this->redis->clientClassName,
+                "Using Redis Format"        => $this->redis->useRedisFormat ? "true" : "false",
+            ] : [
+                "Redis Hostname"            => "Not initialized",
+                "Redis Using Class"         => "Not initialized",
+                "Using Redis Format"        => "Not initialized",
+            ]),
         ];
     }
 
