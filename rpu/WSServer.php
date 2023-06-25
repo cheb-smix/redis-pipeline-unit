@@ -35,8 +35,17 @@ class WSServer extends SmixWebSocketServer
 
     public function run()
     {
+        if (!$this->connected) {
+            $this->redis = new $this->redisConnectionClassName($this->redis);
+            $this->connected = true;
+        }
         $this->pipeline[0] = [];
         parent::run();
+    }
+
+    protected function onBeforeLoop()
+    {
+        $this->redis->keepAlive();
     }
 
     protected function onLoop()
@@ -78,13 +87,6 @@ class WSServer extends SmixWebSocketServer
             $this->currentDatabase = $dbnum;
             $shift = true;
         }
-
-        if (!$this->connected) {
-            
-            $this->redis = new $this->redisConnectionClassName($this->redis);
-            $this->connected = true;
-        }
-
         
         $results = $this->redis->pipeline($cmds);
 
@@ -194,13 +196,13 @@ class WSServer extends SmixWebSocketServer
                 "Compression Min Length"    => Helper::formatBytes($this->compressMinLength),
                 "Redis Connection Class"    => $this->redisConnectionClassName,
             ] + (is_object($this->redis) ? [
+                "Redis TCP KeepAlive"       => $this->redis->TCPKeepAlive,
+                "Redis Last Ping"           => date("Y-m-d H:i:s", $this->redis->lastPing),
                 "Redis Hostname"            => $this->redis->hostname . ":" . $this->redis->port,
                 "Redis Using Class"         => $this->redis->clientClassName,
                 "Using Redis Format"        => $this->redis->useRedisFormat ? "true" : "false",
             ] : [
-                "Redis Hostname"            => "Not initialized",
-                "Redis Using Class"         => "Not initialized",
-                "Using Redis Format"        => "Not initialized",
+                "Redis"                     => "Not initialized",
             ]),
         ];
     }

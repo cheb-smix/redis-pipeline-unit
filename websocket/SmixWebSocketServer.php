@@ -68,6 +68,9 @@ class SmixWebSocketServer
         $connections = [];
 
         while (true) {
+
+            $this->onSocketBeforeLoop();
+
             $read = $connections;
             $read[] = $this->socket;
             $write = $except = null;
@@ -116,6 +119,11 @@ class SmixWebSocketServer
 
             $this->onSocketLoop();
         }
+    }
+
+    private function onSocketBeforeLoop()
+    {
+        $this->onBeforeLoop();
     }
 
     private function onSocketLoop()
@@ -174,6 +182,11 @@ class SmixWebSocketServer
             Helper::printer("Message from $cid [" . strlen($message) . "]: " . substr($message, 0, 100));
             $this->onMessage($cid, $message);
         }
+    }
+
+    protected function onBeforeLoop()
+    {
+
     }
 
     protected function onLoop()
