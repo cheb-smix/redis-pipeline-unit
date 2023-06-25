@@ -13,14 +13,15 @@ class CommonConnection
     public $unixSocket;
     public $password;
     public $database = 0;
-    public $connectionTimeout;
-    public $dataTimeout;
+    public $TCPTimeout = 10;
+    public $TCPKeepAlive = 0;
     public $retries = 0;
     public $retryInterval = 0;
     public $useRedisFormat = false;
     public $socketClientFlags;
 
     public $clientClassName;
+    public $lastPing = 0;
 
     protected $connectionString;
     protected $socket = false;
@@ -35,6 +36,8 @@ class CommonConnection
             if (isset($this->$k)) $this->$k = $v;
         }
         $this->connectionString = $this->getConnectionString();
+        $this->lastPing = time();
+        $this->open();
     }
 
     public function getConnectionString()
@@ -46,9 +49,9 @@ class CommonConnection
         return "tcp://$this->hostname:$this->port";
     }
 
-    public function open()
+    public function open($reconnect = false)
     {
-        if ($this->socket !== false) {
+        if (!$reconnect && $this->socket !== false) {
             return;
         }
 
@@ -59,7 +62,7 @@ class CommonConnection
             $this->port, 
             $this->lastErrorCode, 
             $this->lastErrorDescr, 
-            $this->connectionTimeout ?: ini_get('default_socket_timeout'), 
+            $this->TCPTimeout ?: ini_get('default_socket_timeout'), 
             $this->socketClientFlags
         );
 
@@ -68,9 +71,28 @@ class CommonConnection
             if ($this->password !== null) {
                 $this->pipeline(['AUTH ' . $this->password]);
             }
-            Helper::printer("Redis connected to $this->hostname/$this->port using $this->clientClassName class");
+
+            if (!$reconnect && $KeepAlive = $this->pipeline(['CONFIG GET timeout'])) {
+                $KeepAlive = (int) $KeepAlive[0][1];
+                if ($KeepAlive) {
+                    $this->TCPKeepAlive = (int) ($KeepAlive * 0.9);
+                }
+            }
+
+            Helper::printer("Redis " . ($reconnect ? "re" : "") . "connected to $this->hostname/$this->port using $this->clientClassName class");
         } else {
             throw new \Exception("Failed to open DB connection. $errstr [$errno]");
+        }
+    }
+
+    public function keepAlive()
+    {
+        if ($this->TCPKeepAlive && $this->lastPing < time() - $this->TCPKeepAlive) {
+            $this->lastPing = time();
+            $res = $this->pipeline(['PING']);
+            if (!$res || !$res[0]) {
+                // $this->open(true);
+            }
         }
     }
 
@@ -116,6 +138,8 @@ class CommonConnection
             throw new \Exception("Failed to write to socket. $written of $len bytes written.\nRedis command was: " . $command);
         }
 
+        $this->lastPing = time();
+
         return $this->parsePipeline($command, $cnt);
     }
 
@@ -124,9 +148,9 @@ class CommonConnection
         $result = [];
 
         while ($cnt--) {
-            Helper::printer("Reading $cnt responce");
-
             $line = $this->clientClassName::readline($this->socket);
+
+            var_dump($line);
 
             $lineBreaker = mb_substr($line, -1, 1, '8bit') == "\n";
   
@@ -134,7 +158,7 @@ class CommonConnection
 
             if (!$line) {
                 $cnt++;
-                Helper::printer("Redis EMPTY!");
+                Helper::printer("Redis EMPTY responce!");
                 while ($cnt--) {
                     $result[] = null;
                 }
@@ -151,16 +175,22 @@ class CommonConnection
             }
 
             if ($type == '+') {
+
                 if ($line === 'OK' || $line === 'PONG') {
                     $result[] = true;
                 } else {
                     $result[] = $line;
                 }
+
             } elseif ($type == '-') {
+
                 Helper::printer("Redis responce error: $line");
                 $result[] = null;
+
             } elseif ($type == ':') {
+
                 $result[] = $line;
+
             } elseif ($type == '$') {
 
                 if ($line == '-1') {
@@ -191,18 +221,15 @@ class CommonConnection
                 }
 
             } elseif ($type == '*') {
-                $count = (int) $line;
-                $data = [];
-                for ($i = 0; $i < $count; $i++) {
-                    $data[] = $this->parsePipeline($command, $cnt);
-                }
-                $result[] = $data;
+
+                $result[] = $this->parsePipeline($command, (int) $line);
+
             } else {
+
                 Helper::printer("Redis unhandled responce: [ type: " . var_export($type, true) . ", line: " . var_export($line, true) . "]");
                 $result[] = null;
-            }
 
-            // $cnt--;
+            }
         }
         
         return $result;
