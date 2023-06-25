@@ -91,7 +91,7 @@ class CommonConnection
             $this->lastPing = time();
             $res = $this->pipeline(['PING']);
             if (!$res || !$res[0]) {
-                // $this->open(true);
+                $this->open(true);
             }
         }
     }
@@ -149,8 +149,6 @@ class CommonConnection
 
         while ($cnt--) {
             $line = $this->clientClassName::readline($this->socket);
-
-            var_dump($line);
 
             $lineBreaker = mb_substr($line, -1, 1, '8bit') == "\n";
   
