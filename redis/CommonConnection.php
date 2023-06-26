@@ -33,7 +33,7 @@ class CommonConnection
     public function __construct($config = [])
     {
         foreach ($config as $k => $v) {
-            if (isset($this->$k)) $this->$k = $v;
+            if (property_exists($this, $k)) $this->$k = $v;
         }
         $this->connectionString = $this->getConnectionString();
         $this->lastPing = time();
@@ -68,6 +68,7 @@ class CommonConnection
 
         if ($this->socket) {
             $this->_pool[ $this->connectionString ] = $this->socket;
+            var_dump($this->password);
             if ($this->password !== null) {
                 $this->pipeline(['AUTH ' . $this->password]);
             }
