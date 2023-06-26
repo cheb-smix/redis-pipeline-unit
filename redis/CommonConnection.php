@@ -68,7 +68,7 @@ class CommonConnection
 
         if ($this->socket) {
             $this->_pool[ $this->connectionString ] = $this->socket;
-            var_dump($this->password);
+
             if ($this->password !== null) {
                 $this->pipeline(['AUTH ' . $this->password]);
             }
