@@ -45,19 +45,15 @@ class SmixWebSocketClient
                 $this->socket = Client::connect($this->hostname, $this->port, $this->errno, $this->errstr, $this->connectionTimeout);
                 if ($this->socket) {
                     $this->handshake();
+                } else {
+                    Helper::printer("Connection error");
                 }
             } catch (Exception $e) {
                 Helper::printer("Failed socket connection [$this->errno] $this->errstr");
                 return false;
             }
-        }
-    }
-
-    public function __destruct()
-    {
-        Helper::printer("CLIENT DESCTRUCT");
-        if (!$this->close()) {
-            Helper::printer("FUCKED UP CLOSING SOCKET");
+        } else {
+            Helper::printer("Socket is already opened");
         }
     }
 
@@ -78,7 +74,7 @@ class SmixWebSocketClient
         ]) . "\r\n\r\n";
 
         if (!Client::send($this->socket, $head, $this->lengthInitiatorNumber)) {
-            die('error:'.$this->errno.':'.$this->errstr);
+            die('Handshake error');
         }
     }
 
@@ -95,24 +91,11 @@ class SmixWebSocketClient
             $response = Client::send($this->socket, $data, $this->lengthInitiatorNumber);
 
             if ($response === false) {
-                $this->close();
                 Helper::printer("Looks like connection lost");
                 return false;
             }
 
             return $response;
         }
-    }
-
-    public function close()
-    {
-        if ($this->socket) {
-            if (Client::close($this->socket)) {
-                $this->socket = null;
-                return true;
-            }
-            return false;
-        }
-        return null;
     }
 }

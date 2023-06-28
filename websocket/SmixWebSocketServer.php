@@ -81,7 +81,7 @@ class SmixWebSocketServer
 
             if (in_array($this->socket, $read)) {
                 if (
-                    ($connection = Server::accept($this->socket, $this->connectionTimeout, $peer_name)) 
+                    ($connection = Server::accept($this->socket, $this->connectionTimeout, $peer_name))
                     && 
                     $info = Server::handshake($connection, $this->lengthInitiatorNumber)
                 ) {
@@ -90,7 +90,7 @@ class SmixWebSocketServer
                     $cid = $this->getConnectionID($connection);
 
                     $this->connections[$cid] = [
-                        "resource"      => $connection,
+                        "connection"    => $connection,
                         "peer_name"     => $peer_name,
                         "session_start" => microtime(true),
                         "monitorer"     => false,
@@ -110,7 +110,7 @@ class SmixWebSocketServer
                 if (!$data) {
                     Server::close($connection);
                     unset($connections[array_search($connection, $connections)]);
-                    $this->onSocketClose($connection);
+                    $this->onSocketClose($cid);
                     continue;
                 }
 
@@ -142,10 +142,8 @@ class SmixWebSocketServer
         $this->onOpen($cid);
     }
     
-    private function onSocketClose($connection)
+    private function onSocketClose($cid)
     {
-        $cid = $this->getConnectionID($connection);
-
         if ($this->connections[$cid]["monitorer"]) {
 
             unset($this->connections[$cid], $this->monitorers[$cid]);
@@ -179,7 +177,7 @@ class SmixWebSocketServer
             $this->outputData($cid, json_encode($this->socketStatistics($cid), JSON_UNESCAPED_UNICODE), false);
         } else {
             $this->active[$cid] = $cid;
-            Helper::printer("Message from $cid [" . strlen($message) . "]: " . substr($message, 0, 100));
+            Helper::printer("Message from $cid [" . mb_strlen($message, "UTF-8") . "]: " . $message);
             $this->onMessage($cid, $message);
         }
     }
@@ -224,7 +222,7 @@ class SmixWebSocketServer
 
     private function getConnectionID($connection)
     {
-        preg_match("/[0-9]{1,4}/", (string) $connection, $m);
+        preg_match("/[0-9]+/", (string) $connection, $m);
         return (int) $m[0];
     }
 
@@ -246,7 +244,7 @@ class SmixWebSocketServer
 
     public function outputData($cid, $data, $logging = true)
     {
-        Server::write($this->connections[$cid]['resource'], $data, $this->lengthInitiatorNumber);
+        Server::write($this->connections[$cid]['connection'], $data, $this->lengthInitiatorNumber);
 
         if ($logging) Helper::printer("Response: " . \substr($data, 0, 100));
 

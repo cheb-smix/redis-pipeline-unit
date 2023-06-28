@@ -81,6 +81,7 @@ class CommonConnection
             }
 
             Helper::printer("Redis " . ($reconnect ? "re" : "") . "connected to $this->hostname/$this->port using $this->clientClassName class");
+            Helper::printer("Current Redis Timeout: $this->TCPKeepAlive");
         } else {
             throw new \Exception("Failed to open DB connection. $errstr [$errno]");
         }
