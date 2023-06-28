@@ -12,10 +12,12 @@ class WSServer extends SmixWebSocketServer
     public $redisConnectionClassName = '\redis\SocketConnection';
 
     protected $currentDatabase = 0;
+    protected $currentConnectionsCnt = 0;
     protected $connected = false;
     protected $pipeline = [];
     protected $pipewidth = 2;
-    protected $pipelineMinClients = 10;
+    protected $pipelineMinClients = 3;
+    protected $pipelineFraction = 0.3;
 
     // Metrics
     protected $TPC = 0;
@@ -50,9 +52,9 @@ class WSServer extends SmixWebSocketServer
 
     protected function onLoop()
     {
-        $connectionsCnt = count($this->connections);
+        $this->currentConnectionsCnt = count($this->connections);
 
-        $this->pipewidth = ceil($connectionsCnt / 10);
+        $this->pipewidth = ceil($this->currentConnectionsCnt * $this->pipelineFraction);
 
         if ($this->maxpipewidth < $this->pipewidth) {
             $this->maxpipewidth = $this->pipewidth;
@@ -62,7 +64,7 @@ class WSServer extends SmixWebSocketServer
             if (!$requests) {
                 continue;
             }
-            if ($connectionsCnt < $this->pipelineMinClients || count($requests) >= $this->pipewidth) {
+            if ($this->currentConnectionsCnt < $this->pipelineMinClients || count($requests) >= $this->pipewidth) {
                 Helper::printer("Execute by requests count");
                 $this->executePipeline($dbnum);
                 continue;
