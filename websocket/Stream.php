@@ -125,10 +125,10 @@ class StreamClient extends StreamCommon implements \websocket\ClientInterface
 {
     public static function connect($address, $port = null, &$errno, &$errstr, $timeout = 0, $flags = null)
     {
-        if (strpos($address, "unix") === 0) {
+        if (!$port) {
             return @stream_socket_client($address, $errno, $errstr, $timeout, $flags);
         } else {
-            return @stream_socket_client("$address:$port", $errno, $errstr, $timeout, $flags);
+            return @stream_socket_client("tcp://$address:$port", $errno, $errstr, $timeout, $flags);
         }
     }
 }

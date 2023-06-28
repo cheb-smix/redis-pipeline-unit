@@ -149,7 +149,7 @@ class SocketClient extends SocketCommon implements \websocket\ClientInterface
 {
     public static function connect($address, $port = null, &$errno, &$errstr, $timeout = 0, $flags = null)
     {
-        if (strpos($address, "unix") === 0) {
+        if (!$port) {
             $socket = socket_create(AF_UNIX, SOCK_STREAM, 0);
         } else {
             $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
