@@ -22,5 +22,5 @@ interface ServerInterface
 
 interface ClientInterface
 {
-    public static function connect($hostname, $port, &$errno, &$errstr, $timeout = 0, $flags = null);
+    public static function connect($address, $port = null, &$errno, &$errstr, $timeout = 0, $flags = null);
 }

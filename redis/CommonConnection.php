@@ -23,7 +23,7 @@ class CommonConnection
     public $clientClassName;
     public $lastPing = 0;
 
-    protected $connectionString;
+    protected $address;
     protected $socket = false;
     protected $_pool = [];
     protected $lastErrorCode;
@@ -35,18 +35,19 @@ class CommonConnection
         foreach ($config as $k => $v) {
             if (property_exists($this, $k)) $this->$k = $v;
         }
-        $this->connectionString = $this->getConnectionString();
+        $this->setConnectionString();
         $this->lastPing = time();
         $this->open();
     }
 
-    public function getConnectionString()
+    public function setConnectionString()
     {
-        if ($this->unixSocket) {
-            return 'unix://' . $this->unixSocket;
+        if ($this->unixSocket && is_readable($this->unixSocket) && is_writeable($this->unixSocket)) {
+            $this->address = 'unix://' . $this->unixSocket;
+            $this->port = null;
+        } else {
+            $this->address = "tcp://$this->hostname";
         }
-
-        return "tcp://$this->hostname:$this->port";
     }
 
     public function open($reconnect = false)
@@ -58,7 +59,7 @@ class CommonConnection
         $errno = $errstr = null;
 
         $this->socket = $this->clientClassName::connect(
-            $this->hostname, 
+            $this->address, 
             $this->port, 
             $this->lastErrorCode, 
             $this->lastErrorDescr, 
@@ -67,7 +68,7 @@ class CommonConnection
         );
 
         if ($this->socket) {
-            $this->_pool[ $this->connectionString ] = $this->socket;
+            $this->_pool[ "$this->address:$this->port" ] = $this->socket;
 
             if ($this->password !== null) {
                 $this->pipeline(['AUTH ' . $this->password]);
@@ -80,10 +81,10 @@ class CommonConnection
                 }
             }
 
-            Helper::printer("Redis " . ($reconnect ? "re" : "") . "connected to $this->hostname/$this->port using $this->clientClassName class");
+            Helper::printer("Redis " . ($reconnect ? "re" : "") . "connected to $this->address:$this->port using $this->clientClassName class");
             Helper::printer("Current Redis Timeout: $this->TCPKeepAlive");
         } else {
-            throw new \Exception("Failed to open DB connection. $errstr [$errno]");
+            throw new \Exception("Failed to open DB connection [$this->address:$this->port]. $errstr [$errno]");
         }
     }
 

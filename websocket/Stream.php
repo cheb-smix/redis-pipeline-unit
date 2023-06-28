@@ -123,9 +123,12 @@ class StreamServer extends StreamCommon implements ServerInterface
 
 class StreamClient extends StreamCommon implements \websocket\ClientInterface
 {
-    public static function connect($hostname, $port, &$errno, &$errstr, $timeout = 0, $flags = null)
+    public static function connect($address, $port = null, &$errno, &$errstr, $timeout = 0, $flags = null)
     {
-        Helper::printer("StreamClient connected");
-        return @stream_socket_client("tcp://$hostname:$port", $errno, $errstr, $timeout, $flags);
+        if (strpos($address, "unix") === 0) {
+            return @stream_socket_client($address, $errno, $errstr, $timeout, $flags);
+        } else {
+            return @stream_socket_client("$address:$port", $errno, $errstr, $timeout, $flags);
+        }
     }
 }

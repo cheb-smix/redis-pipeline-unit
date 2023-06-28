@@ -4,8 +4,9 @@ require __DIR__ . "/params.php";
 
 return [
     "redis" => [
-        "hostname"  => 'localhost',
-        "port"      => 6379,
+        // 'unixSocket' => '/var/run/redis/redis.sock', 
+        'hostname' => '127.0.0.1', 
+        'port' => 6379, 
     ],
     "redisConnectionClassName" => '\redis\SocketConnection',
     "protocol"  => "tcp",
@@ -15,5 +16,5 @@ return [
     "pipelineMinClients" => 1,
     "compressEnabled" => true,
     "client_debug_messages_on" => false,
-    "server_debug_messages_on" => false,
+    "server_debug_messages_on" => true,
 ];
