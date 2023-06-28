@@ -14,5 +14,5 @@ return [
     "pipewidth" => 2,
     "pipelineMinClients" => 1,
     "compressEnabled" => false,
-    "client_debug_messages_on" => false,
+    "client_debug_messages_on" => true,
 ];

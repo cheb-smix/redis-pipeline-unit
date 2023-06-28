@@ -38,10 +38,10 @@ class StreamCommon implements \websocket\CommonInterface
         return false;
     }
 
-    public static function send(&$socket, $data, int $lengthInitiatorNumber = 9)
+    public static function send(&$socket, $data, int $lengthInitiatorNumber = 9, bool $clearly = false)
     {
-        if (self::write($socket, $data, $lengthInitiatorNumber)) {
-            return self::read($socket, $lengthInitiatorNumber);
+        if ($d = self::write($socket, $data, $lengthInitiatorNumber, $clearly)) {
+            return self::read($socket, $lengthInitiatorNumber, $clearly);
         }
 
         return false;
@@ -96,6 +96,7 @@ class StreamServer extends StreamCommon implements ServerInterface
 {
     public static function create($hostname, $port, &$errno, &$errstr)
     {
+        Helper::printer("StreamServer created");
         return stream_socket_server("tcp://$hostname:$port", $errno, $errstr);
     }
 
@@ -124,6 +125,7 @@ class StreamClient extends StreamCommon implements \websocket\ClientInterface
 {
     public static function connect($hostname, $port, &$errno, &$errstr, $timeout = 0, $flags = null)
     {
+        Helper::printer("StreamClient connected");
         return @stream_socket_client("tcp://$hostname:$port", $errno, $errstr, $timeout, $flags);
     }
 }

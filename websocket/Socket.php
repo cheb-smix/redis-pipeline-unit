@@ -49,7 +49,12 @@ class SocketCommon implements \websocket\CommonInterface
 
     public static function close(&$socket)
     {
-        return $socket ? @socket_close($socket) : false;
+        if ($socket) {
+            socket_shutdown($socket, 2);
+            socket_close($socket);
+            unset($socket);
+        }
+        return true;
     }
 
     public static function handshake(&$socket, int $lengthInitiatorNumber = 9)
@@ -90,6 +95,15 @@ class SocketCommon implements \websocket\CommonInterface
     
         return false;
     }
+
+    public static function set_buffers(&$socket, $size = 8192)
+    {
+        return (
+            socket_set_option($socket, SOL_SOCKET, SO_SNDBUF, $size)
+            &&
+            socket_set_option($socket, SOL_SOCKET, SO_RCVBUF, $size)
+        );
+    }
 }
 
 
@@ -106,17 +120,12 @@ class SocketServer extends SocketCommon implements \websocket\ServerInterface
         if (!socket_listen($socket)) {
             return false;
         }
+        if (!self::set_buffers($socket, 65536)) {
+            Helper::printer("Set buffers error");
+            return false;
+        }
 
         return $socket;
-    }
-
-    public static function set_buffers(&$socket, $size = 8192)
-    {
-        return (
-            socket_set_option($socket, SOL_SOCKET, SO_SNDBUF, $size)
-            &&
-            socket_set_option($socket, SOL_SOCKET, SO_RCVBUF, $size)
-        );
     }
 
     public static function set_chunk_size(&$socket, $size = 8192)
@@ -150,6 +159,11 @@ class SocketClient extends SocketCommon implements \websocket\ClientInterface
             $errstr = socket_strerror($errno);
             return false;
         }
+        if (!self::set_buffers($socket, 65536)) {
+            Helper::printer("Set buffers error");
+            return false;
+        }
+
         return $socket;
     }
 }

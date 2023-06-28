@@ -7,6 +7,6 @@ use websocket\StreamClient;
 
 class StreamConnection extends CommonConnection
 {
-    public $socketClientFlags = STREAM_CLIENT_CONNECT;
+    // public $socketClientFlags = STREAM_CLIENT_CONNECT;
     public $clientClassName   = "websocket\StreamClient";
 }
