@@ -47,35 +47,28 @@ class App
 
     public function run()
     {
+        if ($this->mode === self::CLIENT_MODE) {
+            define("DEBUG_MESSAGES", $this->config["client_debug_messages_on"]);
+        } else {
+            define("DEBUG_MESSAGES", $this->config["server_debug_messages_on"]);
+        }
+
+        Helper::printer("Loaded classes: \n- " . implode("\n- ", $this->classes));
+
+
         if ($this->mode === self::SERVER_MODE) {
-
-            define("DEBUG_MESSAGES", true);
-
-            Helper::printer("Loaded classes: \n- " . implode("\n- ", $this->classes));
 
             (new WSServer())->init($this->config)->run();
 
         } elseif ($this->mode === self::MONITOR_MODE) {
 
-            define("DEBUG_MESSAGES", true);
-
             (new WSMonitor())->init($this->config)->run();
 
         } elseif ($this->mode === self::CLIENT_MODE) {
 
-            define("DEBUG_MESSAGES", $this->config["client_debug_messages_on"]);
-
-            (new WSClient())->init($this->config)->run($this->argv);
-
-        } elseif ($this->mode === self::CLIENT_MODE) {
-
-            define("DEBUG_MESSAGES", $this->config["client_debug_messages_on"]);
-
             (new WSClient())->init($this->config)->run($this->argv);
 
         } elseif ($this->mode === self::DOS_MODE) {
-
-            define("DEBUG_MESSAGES", $this->config["client_debug_messages_on"]);
 
             $requests = isset($this->argv["requests"]) ? $this->argv["requests"] : 1000;
             $cnt = 0;

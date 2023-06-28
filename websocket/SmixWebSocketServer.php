@@ -134,10 +134,11 @@ class SmixWebSocketServer
     private function onSocketOpen($connection)
     {
         $cid = $this->getConnectionID($connection);
-        $currentCnt = count($this->connections);
-        if ($this->maxConnections < $currentCnt) {
-            $this->maxConnections = $currentCnt;
+
+        if ($this->maxConnections < $this->currentConnectionsCnt) {
+            $this->maxConnections = $this->currentConnectionsCnt;
         }
+        
         Helper::printer("New connection! [$cid on {$this->connections[$cid]["peer_name"]}]");
         $this->onOpen($cid);
     }
@@ -212,7 +213,7 @@ class SmixWebSocketServer
         return [
             "Websocket Daemon Alive  "  => Helper::formatTime(time() - $this->started),
             "Max Socket Connections  "  => $this->maxConnections,
-            "Socket Used Connections "  => count($this->connections) - count($this->monitorers),
+            "Socket Used Connections "  => $this->currentConnectionsCnt - count($this->monitorers),
             "Socket Active Connection"  => count($this->active),
             "Average Session Time"      => $this->avgSessionTime,
             "Total Clients Processed"   => $this->clientsProcessed,
