@@ -46,7 +46,7 @@ class CommonConnection
             $this->address = 'unix://' . $this->unixSocket;
             $this->port = null;
         } else {
-            $this->address = "tcp://$this->hostname";
+            $this->address = $this->hostname;
         }
     }
 
@@ -68,7 +68,7 @@ class CommonConnection
         );
 
         if ($this->socket) {
-            $this->_pool[ "$this->address:$this->port" ] = $this->socket;
+            $this->_pool[ $this->port ? "tcp://$this->address:$this->port" : $this->address ] = $this->socket;
 
             if ($this->password !== null) {
                 $this->pipeline(['AUTH ' . $this->password]);
