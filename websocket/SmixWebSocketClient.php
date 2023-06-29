@@ -9,7 +9,7 @@ class SmixWebSocketClient
 {
     public $compressEnabled = false;
     public $compressMinLength = 2080;
-    public $scheme = "tcp";
+    public $protocol = "tcp";
     public $hostname = "localhost";
     public $port = 1988;
     public $connectionTimeout = 5;
@@ -19,9 +19,8 @@ class SmixWebSocketClient
     
     public $logger;
 
+    protected $addr;
     protected $socket;
-    protected $origin = "";
-    protected $addr = "";
     protected $errno;
     protected $errstr;
 
@@ -31,8 +30,7 @@ class SmixWebSocketClient
             if (property_exists($this, $k)) $this->$k = $v;
         }
 
-        $this->origin = "$this->scheme://$this->hostname";
-        $this->addr = "$this->origin:$this->port";
+        $this->addr = "$this->protocol://$this->hostname:$this->port";
         $this->secretkey = base64_encode(sha1($this->secretkey . "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", true));
 
         return $this;
@@ -63,8 +61,8 @@ class SmixWebSocketClient
     {
         $head = implode("\r\n", [
             "GET / HTTP/1.1",
-            "Host: $this->origin",
-            "Origin: $this->origin",
+            "Host: $this->protocol://$this->hostname",
+            "Origin: $this->protocol://$this->hostname",
             "Upgrade: websocket",
             "Connection: Keep-Alive, Upgrade",
             "Sec-WebSocket-Extensions: permessage-deflate",

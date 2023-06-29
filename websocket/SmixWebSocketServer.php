@@ -9,7 +9,7 @@ class SmixWebSocketServer
 {
     public $compressEnabled = false;
     public $compressMinLength = 3564;
-    public $scheme = "tcp";
+    public $protocol = "tcp";
     public $hostname = "localhost";
     public $port = 1988;
     public $connectionTimeout = 5;
@@ -19,9 +19,8 @@ class SmixWebSocketServer
 
     public $logger;
 
+    protected $addr;
     protected $socket;
-    protected $origin = "";
-    protected $addr = "";
     protected $maxConnections = 0;
     protected $connections = [];
     protected $active = [];
@@ -55,8 +54,7 @@ class SmixWebSocketServer
             if (property_exists($this, $k)) $this->$k = $v;
         }
 
-        $this->origin = "$this->scheme://$this->hostname";
-        $this->addr = "$this->origin:$this->port";
+        $this->addr = "$this->protocol://$this->hostname:$this->port";
 
         return $this;
     }
