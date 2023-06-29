@@ -2,7 +2,6 @@
 
 namespace rpu;
 
-use websocket\SmixConsoleLogger;
 use websocket\SmixWebSocketClient;
 
 class WSMonitor extends SmixWebSocketClient
@@ -17,7 +16,7 @@ class WSMonitor extends SmixWebSocketClient
             if (!$data = $this->send("monitoring")) {
                 break;
             } else {
-                SmixConsoleLogger::statistics(json_decode($data, true));
+                $this->logger::statistics(json_decode($data, true));
                 sleep(1);
             }
         }

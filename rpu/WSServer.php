@@ -15,7 +15,7 @@ class WSServer extends SmixWebSocketServer
     protected $currentConnectionsCnt = 0;
     protected $connected = false;
     protected $pipeline = [];
-    protected $pipewidth = 2;
+    protected $pipewidth = 1;
     protected $pipelineMinClients = 3;
     protected $pipelineFraction = 0.3;
 
@@ -30,7 +30,12 @@ class WSServer extends SmixWebSocketServer
 
     public function __destruct()
     {
-        Helper::printer($this->redis->close() ? "Redis connection closed" : "Redis connection closing failed");
+        if ($this->redis->close()) {
+            $this->logger->success("Redis connection closed");
+        } else {
+            $this->logger->error("Redis connection closing failed");
+        }
+        
 
         parent::__destruct();
     }
@@ -38,6 +43,7 @@ class WSServer extends SmixWebSocketServer
     public function run()
     {
         if (!$this->connected) {
+            $this->redis["logger"] = &$this->logger;
             $this->redis = new $this->redisConnectionClassName($this->redis);
             $this->connected = true;
         }
@@ -65,12 +71,12 @@ class WSServer extends SmixWebSocketServer
                 continue;
             }
             if ($this->currentConnectionsCnt < $this->pipelineMinClients || count($requests) >= $this->pipewidth) {
-                Helper::printer("Execute by requests count");
+                $this->logger->info("Execute by requests count");
                 $this->executePipeline($dbnum);
                 continue;
             }
             if (array_sum(array_column($requests, "count")) >= $this->pipewidth) {
-                Helper::printer("Execute by clients per requests count");
+                $this->logger->info("Execute by clients per requests count");
                 $this->executePipeline($dbnum);
                 continue;
             }
@@ -113,7 +119,7 @@ class WSServer extends SmixWebSocketServer
         $this->commandsExecuted += count($cmds);
 
         $executionTime = microtime(true) - $start;
-        Helper::printer("Pipelined in " . round($executionTime, 6) . " seconds");
+        $this->logger->info("Pipelined in " . round($executionTime, 6) . " seconds");
 
         $this->totalExecTime += $executionTime;
         
@@ -172,40 +178,51 @@ class WSServer extends SmixWebSocketServer
     protected function socketStatistics($cid)
     {
         return [
-            "Socket Metrics" => parent::socketStatistics($cid) + [
-                "Current Unique Requests"   => array_sum(array_map(function ($requests) {
-                    return count($requests);
-                }, $this->pipeline)),
-                "Current Total Requests"    => array_sum(array_map(function ($requests) {
-                    return array_sum(array_column($requests, "count"));
-                }, $this->pipeline)),
-                "Current Database Acrive"   => $this->currentDatabase,
-                "Current Pipeline Width"    => $this->pipewidth,
-                "Current Pipeline Size"     => count($this->pipeline),
-                "Max PipelineWidth Reached" => $this->maxpipewidth,
-                "Time Per Redis Command"    => $this->TPC,
-                "Time Per Client Request"   => $this->TPR,
-                "Total Execution Time"      => round($this->totalExecTime, 6),
-                "Total Pipeline Executed"   => $this->pipelineExecuted,
-                "Total Commands Executed"   => $this->commandsExecuted,
-                "Total Requests Processed"  => $this->totalRequests,
-            ],
-            "Common Parameters" => [
-                "PHP Memory Usage"          => Helper::formatBytes(memory_get_usage()),
-                "CPU Usage"                 => (($load = Helper::getCPULoad()) ? round($load, 2) . "%" : "NaN"),
-                "Websocket Hostname"        => $this->addr,
-                "Compression Enabled"       => $this->compressEnabled ? "true" : "false",
-                "Compression Min Length"    => Helper::formatBytes($this->compressMinLength),
-                "Redis Connection Class"    => $this->redisConnectionClassName,
-            ] + (is_object($this->redis) ? [
-                "Redis TCP KeepAlive"       => $this->redis->TCPKeepAlive,
-                "Redis Last Ping"           => date("Y-m-d H:i:s", $this->redis->lastPing),
-                "Redis Hostname"            => $this->redis->hostname . ":" . $this->redis->port,
-                "Redis Using Class"         => $this->redis->clientClassName,
-                "Using Redis Format"        => $this->redis->useRedisFormat ? "true" : "false",
-            ] : [
-                "Redis"                     => "Not initialized",
-            ]),
+            "data" => [
+                "Socket Metrics" => parent::socketStatistics($cid) + [
+                    "Current Unique Requests"   => array_sum(array_map(function ($requests) {
+                        return count($requests);
+                    }, $this->pipeline)),
+                    "Current Total Requests"    => array_sum(array_map(function ($requests) {
+                        return array_sum(array_column($requests, "count"));
+                    }, $this->pipeline)),
+                    "Current Database Acrive"   => $this->currentDatabase,
+                    "Current Pipeline Width"    => $this->pipewidth,
+                    "Current Pipeline Size"     => count($this->pipeline),
+                    "Max PipelineWidth Reached" => $this->maxpipewidth,
+                    "Time Per Redis Command"    => $this->TPC,
+                    "Time Per Client Request"   => $this->TPR,
+                    "Total Execution Time"      => round($this->totalExecTime, 6),
+                    "Total Pipeline Executed"   => $this->pipelineExecuted,
+                    "Total Commands Executed"   => $this->commandsExecuted,
+                    "Total Requests Processed"  => $this->totalRequests,
+                ],
+                "Common Parameters" => [
+                    "PHP Memory Usage"          => Helper::formatBytes(memory_get_usage()),
+                    "CPU Usage"                 => (($load = Helper::getCPULoad()) ? round($load, 2) . "%" : "NaN"),
+                    "Websocket Hostname"        => $this->addr,
+                    "Compression Enabled"       => $this->compressEnabled ? "true" : "false",
+                    "Compression Min Length"    => Helper::formatBytes($this->compressMinLength),
+                    "Redis Connection Class"    => $this->redisConnectionClassName,
+                ] + (is_object($this->redis) ? [
+                    "Redis TCP KeepAlive"       => $this->redis->TCPKeepAlive,
+                    "Redis Last Ping"           => date("Y-m-d H:i:s", $this->redis->lastPing),
+                    "Redis Hostname"            => $this->redis->hostname . ":" . $this->redis->port,
+                    "Redis Using Class"         => $this->redis->clientClassName,
+                    "Using Redis Format"        => $this->redis->useRedisFormat ? "true" : "false",
+                    "Redis Resp Type String"    => $this->redis->commandsStat["+"],
+                    "Redis Resp Type Error"     => $this->redis->commandsStat["-"],
+                    "Redis Resp Type Integer"   => $this->redis->commandsStat[":"],
+                    "Redis Resp Type Bulk"      => $this->redis->commandsStat["$"],
+                    "Redis Resp Type Array"     => $this->redis->commandsStat["*"],
+                    "Redis Resp Type Unknown"   => $this->redis->commandsStat["?"],
+                    "Redis Last Error Command"  => substr(preg_replace("/[\r\n]+/", " ", $this->redis->lastErrorCommand), 0, 30),
+                    "Redis Last Error Descr"    => substr($this->redis->lastErrorDescription, 0, 30),
+                ] : [
+                    "Redis"                     => "Not initialized",
+                ]),
+            ], 
+            "warning" => $this->redis->lastErrorCommand ? $this->redis->lastErrorDescription . ": " . $this->redis->lastErrorCommand : '',
         ];
     }
 

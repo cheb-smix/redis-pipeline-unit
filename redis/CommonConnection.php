@@ -2,7 +2,6 @@
 
 namespace redis;
 
-use rpu\Helper;
 use websocket\SocketClient;
 use websocket\StreamClient;
 
@@ -20,8 +19,19 @@ class CommonConnection
     public $useRedisFormat = false;
     public $socketClientFlags;
 
+    public $logger;
     public $clientClassName;
     public $lastPing = 0;
+    public $commandsStat = [
+        '+' => 0,
+        '-' => 0,
+        ':' => 0,
+        '$' => 0,
+        '*' => 0,
+        '?' => 0,
+    ];
+    public $lastErrorCommand;
+    public $lastErrorDescription;
 
     protected $address;
     protected $socket = false;
@@ -29,6 +39,7 @@ class CommonConnection
     protected $lastErrorCode;
     protected $lastErrorDescr;
     protected $logStringLimit = 0;
+    
 
     public function __construct($config = [])
     {
@@ -81,10 +92,10 @@ class CommonConnection
                 }
             }
 
-            Helper::printer("Redis " . ($reconnect ? "re" : "") . "connected to $this->address:$this->port using $this->clientClassName class");
-            Helper::printer("Current Redis Timeout: $this->TCPKeepAlive");
+            $this->logger->success("Redis " . ($reconnect ? "re" : "") . "connected to $this->address:$this->port using $this->clientClassName class");
+            $this->logger->info("Current Redis Timeout: $this->TCPKeepAlive");
         } else {
-            throw new \Exception("Failed to open DB connection [$this->address:$this->port]. $errstr [$errno]");
+            $this->logger->exception("Failed to open DB connection [$this->address:$this->port]. $errstr [$errno]");
         }
     }
 
@@ -132,13 +143,13 @@ class CommonConnection
 
         $written = $this->clientClassName::write($this->socket, $command, 0, true);
 
-        Helper::printer("Written: [$written] " . ($this->logStringLimit ? \substr($command, 0, $this->logStringLimit) : $command));
+        $this->logger->info("Written: [$written] " . ($this->logStringLimit ? \substr($command, 0, $this->logStringLimit) : $command));
 
         if ($written === false) {
-            throw new \Exception("Failed to write to socket.\nRedis command was: " . $command);
+            $this->logger->exception("Failed to write to socket.\nRedis command was: " . $command);
         }
         if ($written !== ($len = mb_strlen($command, '8bit'))) {
-            throw new \Exception("Failed to write to socket. $written of $len bytes written.\nRedis command was: " . $command);
+            $this->logger->exception("Failed to write to socket.\nRedis command was: " . $command);
         }
 
         $this->lastPing = time();
@@ -159,7 +170,7 @@ class CommonConnection
 
             if (!$line) {
                 $cnt++;
-                Helper::printer("Redis EMPTY responce!");
+                $this->logger->error("Redis EMPTY responce!");
                 while ($cnt--) {
                     $result[] = null;
                 }
@@ -169,7 +180,7 @@ class CommonConnection
             $type = $line[0];
             $line = mb_substr($line, 1, null, '8bit');
 
-            Helper::printer("Redis responce inbound: [ type: " . var_export($type, true) . ", line: " . var_export($line, true) . "]");
+            $this->logger->info("Redis responce inbound: [ type: " . var_export($type, true) . ", line: " . var_export($line, true) . "]");
 
             if (!$lineBreaker) {
                 $this->clientClassName::read($this->socket, 1, true); // just for reading next \n symbol after \r
@@ -185,8 +196,10 @@ class CommonConnection
 
             } elseif ($type == '-') {
 
-                Helper::printer("Redis responce error: $line");
+                $this->logger->error("Redis responce error: $line on command: $command");
                 $result[] = null;
+                $this->lastErrorCommand = $command;
+                $this->lastErrorDescription = $line;
 
             } elseif ($type == ':') {
 
@@ -201,7 +214,7 @@ class CommonConnection
                     $data = '';
                     while ($length > 0) {
                         if (($block = $this->clientClassName::read($this->socket, $length, true)) === false) {
-                            Helper::printer("Failed to read from socket.\nRedis command was: " . "[" . strlen($command) . "]" . $command);
+                            $this->logger->error("Failed to read from socket.\nRedis command was: " . "[" . strlen($command) . "]" . $command);
                             $data = null;
                             break;
                         } else {
@@ -227,10 +240,13 @@ class CommonConnection
 
             } else {
 
-                Helper::printer("Redis unhandled responce: [ type: " . var_export($type, true) . ", line: " . var_export($line, true) . "]");
+                $this->logger->error("Redis unhandled responce: [ type: " . var_export($type, true) . ", line: " . var_export($line, true) . "]");
                 $result[] = null;
+                $type = "?";
 
             }
+
+            $this->commandsStat[$type]++;
         }
         
         return $result;

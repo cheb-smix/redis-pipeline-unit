@@ -50,7 +50,7 @@ class SocketCommon implements \websocket\CommonInterface
     public static function close(&$socket)
     {
         if ($socket) {
-            socket_shutdown($socket, 2);
+            @socket_shutdown($socket, 2);
             socket_close($socket);
             unset($socket);
         }
@@ -121,7 +121,6 @@ class SocketServer extends SocketCommon implements \websocket\ServerInterface
             return false;
         }
         if (!self::set_buffers($socket, 65536)) {
-            Helper::printer("Set buffers error");
             return false;
         }
 
@@ -166,7 +165,6 @@ class SocketClient extends SocketCommon implements \websocket\ClientInterface
             return false;
         }
         if (!self::set_buffers($socket, 65536)) {
-            Helper::printer("Set buffers error");
             return false;
         }
 

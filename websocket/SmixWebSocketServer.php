@@ -17,6 +17,8 @@ class SmixWebSocketServer
     public $debugMessagesOn = true;
     public $lengthInitiatorNumber = 9;
 
+    public $logger;
+
     protected $socket;
     protected $origin = "";
     protected $addr = "";
@@ -33,10 +35,18 @@ class SmixWebSocketServer
     public function __destruct()
     {
         foreach ($this->connections as $c) {
-            Helper::printer($c["peer_name"] . (Server::close($c["connection"]) ? " has been disconnected" : " disconnection failed"));
+            if (Server::close($c["connection"])) {
+                $this->logger->success($c["peer_name"] . " has been disconnected");
+            } else {
+                $this->logger->info($c["peer_name"] . " disconnection failed");
+            }
+            
         }
-        Helper::printer(Server::close($this->socket) ? "Main socket closed" : "Main socket closing failed");
-        Helper::printer("SERVER DESTRUCT");
+        if (Server::close($this->socket)) {
+            $this->logger->success("Main socket closed");
+        } else {
+            $this->logger->info("Main socket closing failed");
+        }
     }
 
     public function init(array &$config = [])
@@ -60,9 +70,9 @@ class SmixWebSocketServer
         $this->socket = Server::create($this->hostname, $this->port, $errno, $errstr);
 
         if (!$this->socket) {
-            Helper::printer("Socket error $errstr ($errno)", false, true);
+            $this->logger->exception("Socket error $errstr ($errno)", false, true);
         } else {
-            Helper::printer("Socket started at $this->addr");
+            $this->logger->success("Socket started at $this->addr");
         }
 
         $connections = [];
@@ -139,7 +149,7 @@ class SmixWebSocketServer
             $this->maxConnections = $this->currentConnectionsCnt;
         }
         
-        Helper::printer("New connection! [$cid on {$this->connections[$cid]["peer_name"]}]");
+        $this->logger->info("New connection! [$cid on {$this->connections[$cid]["peer_name"]}]");
         $this->onOpen($cid);
     }
     
@@ -148,7 +158,7 @@ class SmixWebSocketServer
         if ($this->connections[$cid]["monitorer"]) {
 
             unset($this->connections[$cid], $this->monitorers[$cid]);
-            Helper::printer("Monitorer $cid has disconnected");
+            $this->logger->info("Monitorer $cid has disconnected");
 
         } else {
 
@@ -161,7 +171,7 @@ class SmixWebSocketServer
 
             $this->onClose($cid);
             unset($this->connections[$cid], $this->active[$cid]);
-            Helper::printer("Client $cid has disconnected");
+            $this->logger->info("Client $cid has disconnected");
 
         }
     }
@@ -178,7 +188,7 @@ class SmixWebSocketServer
             $this->outputData($cid, json_encode($this->socketStatistics($cid), JSON_UNESCAPED_UNICODE), false);
         } else {
             $this->active[$cid] = $cid;
-            Helper::printer("Message from $cid [" . mb_strlen($message, "UTF-8") . "]: " . $message);
+            $this->logger->info("Message from $cid [" . mb_strlen($message, "UTF-8") . "]: " . $message);
             $this->onMessage($cid, $message);
         }
     }
@@ -227,27 +237,11 @@ class SmixWebSocketServer
         return (int) $m[0];
     }
 
-    public function printer($s, $obj = false, $die = false)
-    {
-        print date("Y-m-d | H:i:s >> ");
-
-        if ($obj) {
-            print_r($s);
-        } else {
-            print $s;
-        }
-        print "\n";
-
-        if ($die) {
-            exit;
-        }
-    }
-
     public function outputData($cid, $data, $logging = true)
     {
         Server::write($this->connections[$cid]['connection'], $data, $this->lengthInitiatorNumber);
 
-        if ($logging) Helper::printer("Response: " . \substr($data, 0, 100));
+        if ($logging) $this->logger->info("Response: " . \substr($data, 0, 100));
 
         unset($this->active[$cid]);
 
