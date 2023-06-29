@@ -15,30 +15,30 @@ class Logger
         }
     }
 
-    public function exception($data)
+    public function exception($data, bool $includeDt = true)
     {
-        $this->writeError($data);
+        $this->error($data);
         throw new \Exception($data);
     }
 
-    public function info($data)
+    public function info($data, bool $includeDt = true)
     {
-        $this->write($data, LOGGER_INFO_LVL);
+        $this->write($data, LOGGER_INFO_LVL, $includeDt);
     }
 
-    public function error($data)
+    public function error($data, bool $includeDt = true)
     {
-        $this->write($data, LOGGER_ERROR_LVL);
+        $this->write($data, LOGGER_ERROR_LVL, $includeDt);
     }
 
-    public function success($data)
+    public function success($data, bool $includeDt = true)
     {
-        $this->write($data, LOGGER_SUCCEEDED);
+        $this->write($data, LOGGER_SUCCEEDED, $includeDt);
     }
 
-    public function write($data, int $loglvl = LOGGER_INFO_LVL)
+    public function write($data, int $loglvl = LOGGER_INFO_LVL, bool $includeDt = true)
     {
-        $this->prepare($data);
+        $this->prepare($data, $includeDt);
         $this->print($data, $loglvl);
 
         if (!$this->logFile) {
@@ -58,9 +58,9 @@ class Logger
         }
     }
 
-    public function prepare(&$data)
+    public function prepare(&$data, bool $includeDt = true)
     {
-        $data = date("Y-m-d | H:i:s >> ") . (in_array(gettype($data), ["integer", "string", "double"]) ? $data : print_r($data, true));
+        $data = ($includeDt ? date("Y-m-d | H:i:s >> ") : "") . (in_array(gettype($data), ["integer", "string", "double"]) ? $data : print_r($data, true));
     }
 
     public function print(string $string, int $loglvl = LOGGER_INFO_LVL)

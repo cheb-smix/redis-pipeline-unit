@@ -70,7 +70,7 @@ class SmixWebSocketServer
         $this->socket = Server::create($this->hostname, $this->port, $errno, $errstr);
 
         if (!$this->socket) {
-            $this->logger->error("Socket error $errstr ($errno)", false, true);
+            $this->logger->exception("Socket error $errstr ($errno)", false, true);
         } else {
             $this->logger->success("Socket started at $this->addr");
         }

@@ -83,7 +83,7 @@ class SmixWebSocketClient
     public function send($data)
     {
         if (!$this->socket) {
-            $this->logger->error("Socket error");
+            $this->logger->exception("Socket error");
             return false;
         } else {
             if (!is_string($data)) {
