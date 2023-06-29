@@ -25,9 +25,13 @@ class App
         "-h" => "help",
         "-i" => "init",
         "-k" => "key",
+        "-l" => "loggerMode",
         "-m" => "monitor",
+        "-p" => "port",
         "-r" => "requests",
         "-s" => "server",
+        "host",
+        "protocol",
     ];
 
     public function __construct($argv)
@@ -52,7 +56,15 @@ class App
             }
             $key = $argv[$i][0];
             $this->argRebuild($key);
-            $this->argv[$key] = $value;
+            if (in_array($key, $this->availableArgv)) {
+                $this->argv[$key] = $value;
+            }
+        }
+
+        foreach ($this->argv as $k => $v) {
+            if (array_key_exists($k, $this->config)) {
+                $this->config[$k] = $v;
+            }
         }
 
         $this->mode = self::UNDEFINED_MODE;
@@ -73,7 +85,8 @@ class App
 
         $this->logger = new Logger();
         if ($this->mode < self::HELP_MODE) {
-            $this->logger->info("Loaded classes: \n- " . implode("\n- ", $this->classes));
+            $this->logger->info("Loaded classes:");
+            $this->logger->info($this->classes);
             $this->logger->info("Loaded config:");
             $this->logger->info($this->config);
             $this->logger->info("Taken arguments:");
@@ -117,9 +130,13 @@ class App
             $this->logger->info("-d, --dos\t\tRun WebSocket DOS Sequence Example [syntetic test]", false);
             $this->logger->info("-f, --force <num>\tForce rewrite local config", false);
             $this->logger->info("-h, --help\t\tHelp info", false);
+            $this->logger->info("--host\t\tSpecify a host for websocket unit", false);
             $this->logger->info("-i, --init\t\tInitiate local stuff", false);
             $this->logger->info("-k, --key <string>\tSpecify a custom key name", false);
+            $this->logger->info("-l, --loggerMode <num>\tSet logger mode [0 - disabled, 1 - errors, 2 - +succeeded, 3 - +info", false);
             $this->logger->info("-m, --monitor\t\tRun WebSocket Monitor", false);
+            $this->logger->info("-p, --port\t\tSpecify a port for websocket unit", false);
+            $this->logger->info("--protocol\t\tSpecify a scheme for websocket unit", false);
             $this->logger->info("-r, --requests <num>\tSpecify a number of request sequence", false);
             $this->logger->info("-s, --server\t\tRun WebSocket Server", false);
 
