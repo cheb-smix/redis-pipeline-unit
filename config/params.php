@@ -1,5 +1,10 @@
 <?php
 
+define("LOGGER_DISABLED", 0);
+define("LOGGER_ERROR_LVL", 1);
+define("LOGGER_SUCCEEDED", 2);
+define("LOGGER_INFO_LVL", 3);
+
 define("REDIS_COMMANDS", array_flip([
     'APPEND', // Append a value to a key
     'AUTH', // Authenticate to the server

@@ -17,6 +17,8 @@ class SmixWebSocketClient
     public $debugMessagesOn = true;
     public $lengthInitiatorNumber = 9;
     
+    public $logger;
+
     protected $socket;
     protected $origin = "";
     protected $addr = "";
@@ -38,7 +40,7 @@ class SmixWebSocketClient
 
     public function run()
     {
-        Helper::printer(get_class($this) . " started on $this->addr");
+        $this->logger->success(get_class($this) . " started on $this->addr");
 
         if (!$this->socket) {
             try {
@@ -46,14 +48,14 @@ class SmixWebSocketClient
                 if ($this->socket) {
                     $this->handshake();
                 } else {
-                    Helper::printer("Connection error");
+                    $this->logger->error("Connection error");
                 }
             } catch (Exception $e) {
-                Helper::printer("Failed socket connection [$this->errno] $this->errstr");
+                $this->logger->error("Failed socket connection [$this->errno] $this->errstr");
                 return false;
             }
         } else {
-            Helper::printer("Socket is already opened");
+            $this->logger->info("Socket is already opened");
         }
     }
 
@@ -81,7 +83,7 @@ class SmixWebSocketClient
     public function send($data)
     {
         if (!$this->socket) {
-            Helper::printer("Socket error");
+            $this->logger->error("Socket error");
             return false;
         } else {
             if (!is_string($data)) {
@@ -91,7 +93,7 @@ class SmixWebSocketClient
             $response = Client::send($this->socket, $data, $this->lengthInitiatorNumber);
 
             if ($response === false) {
-                Helper::printer("Looks like connection lost");
+                $this->logger->error("Looks like connection lost");
                 return false;
             }
 

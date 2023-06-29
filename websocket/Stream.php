@@ -96,7 +96,6 @@ class StreamServer extends StreamCommon implements ServerInterface
 {
     public static function create($hostname, $port, &$errno, &$errstr)
     {
-        Helper::printer("StreamServer created");
         return stream_socket_server("tcp://$hostname:$port", $errno, $errstr);
     }
 

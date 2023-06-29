@@ -9,6 +9,8 @@ class App
     const MONITOR_MODE = 9;
     const DOS_MODE = 10;
 
+    public $logger;
+
     private $mode;
     private $config = [];
     private $classes = [];
@@ -43,19 +45,24 @@ class App
                 break;
             }
         }
-    }
 
-    public function run()
-    {
         if ($this->mode === self::CLIENT_MODE) {
             define("DEBUG_MESSAGES", $this->config["client_debug_messages_on"]);
         } else {
             define("DEBUG_MESSAGES", $this->config["server_debug_messages_on"]);
         }
+        define("LOGGER_MODE", $this->config['loggerMode']);
 
-        Helper::printer("Loaded classes: \n- " . implode("\n- ", $this->classes));
+        $this->logger = new Logger();
+        $this->logger->info("Loaded classes: \n- " . implode("\n- ", $this->classes));
+        $this->logger->info("Loaded config:");
+        $this->logger->info($this->config);
 
+        $this->config["logger"] = &$this->logger;
+    }
 
+    public function run()
+    {
         if ($this->mode === self::SERVER_MODE) {
 
             (new WSServer())->init($this->config)->run();

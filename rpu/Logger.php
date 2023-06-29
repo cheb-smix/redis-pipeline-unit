@@ -1,10 +1,81 @@
 <?php
 
-namespace websocket;
+namespace rpu;
 
-class SmixConsoleLogger
+class Logger
 {
-    private static $init = false;
+    public $loggerEnabled = false;
+    public $logFile;
+    public $fs;
+
+    public function __destruct()
+    {
+        if ($this->fs) {
+            fclose($this->fs);
+        }
+    }
+
+    public function exception($data)
+    {
+        $this->writeError($data);
+        throw new \Exception($data);
+    }
+
+    public function info($data)
+    {
+        $this->write($data, LOGGER_INFO_LVL);
+    }
+
+    public function error($data)
+    {
+        $this->write($data, LOGGER_ERROR_LVL);
+    }
+
+    public function success($data)
+    {
+        $this->write($data, LOGGER_SUCCEEDED);
+    }
+
+    public function write($data, int $loglvl = LOGGER_INFO_LVL)
+    {
+        $this->prepare($data);
+        $this->print($data, $loglvl);
+
+        if (!$this->logFile) {
+            $this->logFile = __DIR__ . "/../log/rpu.log." . date("d.m.Y") . ".log"; 
+        }
+        
+        if (LOGGER_MODE < $loglvl) {
+            return;
+        }
+        
+        if (!$this->fs) {
+            $this->fs = fopen($this->logFile, "a+");
+        }
+
+        if ($this->fs) {
+            fwrite($this->fs, $data);
+        }
+    }
+
+    public function prepare(&$data)
+    {
+        $data = date("Y-m-d | H:i:s >> ") . (in_array(gettype($data), ["integer", "string", "double"]) ? $data : print_r($data, true));
+    }
+
+    public function print(string $string, int $loglvl = LOGGER_INFO_LVL)
+    {
+        if (DEBUG_MESSAGES) {
+            if ($loglvl == LOGGER_SUCCEEDED) {
+                $style = "\e[92m";
+            } elseif ($loglvl == LOGGER_ERROR_LVL) {
+                $style = "\e[91m";
+            } else {
+                $style = "\e[37m";
+            }
+            print "$style$string\e[0m\n";
+        }
+    }
 
     public static function progress($done, $total, $size = 30, $label = "", $refreshing = true)
     {
@@ -57,14 +128,14 @@ class SmixConsoleLogger
             return;
         }
 
-        foreach ($data as &$col) {
+        foreach ($data["data"] as &$col) {
             ksort($col);
         }
 
-        echo self::tablelized($data);
+        echo self::tablelized($data["data"], $data["warning"]);
     }
 
-    private static function multilined($data = [])
+    private static function multilined($data = [], $bottomWarning = "")
     {
         $tmp = [];
         foreach ($data as $c => $col) {
@@ -79,7 +150,7 @@ class SmixConsoleLogger
         . "\e[0;33m" . implode("\n", $tmp) . "\n\e[0m";
     }
 
-    private static function tablelized($data = [])
+    private static function tablelized($data = [], $bottomWarning = "")
     {
         $cols = count($data);
         if ($cols > 3) {
@@ -133,6 +204,10 @@ class SmixConsoleLogger
             $output .= "|\n";
         }
         $output .= "|" . str_repeat("_", $tableWidth - 2) . "|\n";
+        
+        if ($bottomWarning) {
+            $output .= "\n\e[101m" . $bottomWarning . "\e[0m\n";
+        }
 
         return $output;
     } 
