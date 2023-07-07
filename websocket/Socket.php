@@ -120,9 +120,6 @@ class SocketServer extends SocketCommon implements \websocket\ServerInterface
         if (!socket_listen($socket)) {
             return false;
         }
-        if (!self::set_buffers($socket, 65536)) {
-            return false;
-        }
 
         return $socket;
     }
@@ -162,9 +159,6 @@ class SocketClient extends SocketCommon implements \websocket\ClientInterface
         if (!socket_connect($socket, $address, $port)) {
             $errno = socket_last_error($socket);
             $errstr = socket_strerror($errno);
-            return false;
-        }
-        if (!self::set_buffers($socket, 65536)) {
             return false;
         }
 
